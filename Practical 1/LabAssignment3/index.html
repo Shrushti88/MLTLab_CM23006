@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ML Generalization & Prediction</title>
+
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #e3f2fd, #f8f9fa);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .card {
+            width: 900px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            padding: 30px;
+        }
+
+        h1 {
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .model-box {
+            background: #f1f3f5;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: monospace;
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            background: #3498db;
+            color: white;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+
+        th {
+            background: #3498db;
+            color: white;
+        }
+
+        .good {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .hint {
+            margin-top: 15px;
+            background: #e8f4fd;
+            padding: 10px;
+            border-left: 4px solid #3498db;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>3. Predict Unseen Inputs & Compare Results</h1>
+
+    <div class="model-box" id="modelEqn">
+        Training model...
+    </div>
+
+    <div class="input-row">
+        <input id="inputX" type="number" placeholder="Enter unseen X value">
+        <button onclick="uiPredict()">Predict</button>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Input (X)</th>
+                <th>Expected</th>
+                <th>Predicted</th>
+                <th>Error (%)</th>
+            </tr>
+        </thead>
+        <tbody id="results"></tbody>
+    </table>
+
+    <div class="hint">
+        🔹 Console support available: <code>predict(x)</code><br>
+        🔹 Example: <code>predict(6)</code>, <code>predict(10.5)</code>
+    </div>
+</div>
+
+<script>
+let model, m, c;
+
+// Training data (known relationship)
+const trainX = [1,2,3,4,5];
+const trainY = [8,11,14,17,20]; // y = 3x + 5
+
+async function trainModel() {
+    model = tf.sequential();
+    model.add(tf.layers.dense({ units: 1, inputShape: [1] }));
+    model.compile({
+        optimizer: tf.train.sgd(0.01),
+        loss: 'meanSquaredError'
+    });
+
+    const xs = tf.tensor2d(trainX, [trainX.length,1]);
+    const ys = tf.tensor2d(trainY, [trainY.length,1]);
+
+    await model.fit(xs, ys, { epochs: 200 });
+
+    const weights = model.getWeights();
+    m = weights[0].dataSync()[0];
+    c = weights[1].dataSync()[0];
+
+    document.getElementById("modelEqn").innerText =
+        `Learned Model: y = ${m.toFixed(2)}x + ${c.toFixed(2)}`;
+
+    console.log("Model trained");
+}
+
+// Prediction logic (shared by UI + console)
+function makePrediction(x) {
+    const input = tf.tensor2d([x], [1,1]);
+    const predicted = model.predict(input).dataSync()[0];
+    const expected = 3 * x + 5;
+    const error = (Math.abs(expected - predicted) / expected * 100).toFixed(2);
+
+    const row = document.getElementById("results").insertRow(0);
+    row.innerHTML = `
+        <td>${x}</td>
+        <td>${expected.toFixed(2)}</td>
+        <td class="good">${predicted.toFixed(2)}</td>
+        <td>${error}%</td>
+    `;
+
+    console.log(`x=${x}, expected=${expected}, predicted=${predicted.toFixed(2)}`);
+}
+
+// UI button handler
+function uiPredict() {
+    const x = parseFloat(document.getElementById("inputX").value);
+    if (!isNaN(x)) makePrediction(x);
+}
+
+// Console access
+window.predict = (x) => makePrediction(x);
+
+// Train on load
+trainModel();
+</script>
+
+</body>
+</html>

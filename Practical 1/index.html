@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Practical 1 – Linear Regression</title>
+
+  <!-- TensorFlow.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</head>
+
+<body>
+  <h2>Linear Regression with Synthetic Data</h2>
+
+  <script>
+    /* -----------------------------
+       1. Generate Synthetic Data
+       y = 2x + 1 + noise
+    ------------------------------*/
+    const x = tf.tensor1d([1,2,3,4,5,6,7,8,9,10]);
+    const y = tf.tensor1d([3,5,7,9,11,13,15,17,19,21]);
+
+    /* -----------------------------
+       2. Define the Model
+       tf.sequential + dense layer
+    ------------------------------*/
+    const model = tf.sequential();
+    model.add(tf.layers.dense({ units: 1, inputShape: [1] }));
+
+    /* -----------------------------
+       3. Compile Model
+       (learning rate can be changed)
+    ------------------------------*/
+    const learningRate = 0.01;
+    const optimizer = tf.train.sgd(learningRate);
+
+    model.compile({
+      optimizer: optimizer,
+      loss: 'meanSquaredError'
+    });
+
+    /* -----------------------------
+       4. Train the Model
+    ------------------------------*/
+    async function trainModel() {
+      await model.fit(x, y, {
+        epochs: 200,
+        callbacks: {
+          onEpochEnd: (epoch, logs) => {
+            if (epoch % 50 === 0) {
+              console.log(`Epoch ${epoch}: Loss = ${logs.loss}`);
+            }
+          }
+        }
+      });
+
+      predictValues();
+    }
+
+    /* -----------------------------
+       5. Predictions (Unseen Data)
+    ------------------------------*/
+    function predictValues() {
+      const testX = tf.tensor1d([11, 12, 13]);
+      const predictions = model.predict(testX);
+
+      predictions.print();
+    }
+
+    trainModel();
+  </script>
+</body>
+</html>

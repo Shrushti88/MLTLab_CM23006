@@ -1,0 +1,5 @@
+Learning rate 0.0001 showed very slow convergence.
+Learning rate 0.001 converged steadily with minimal oscillations.
+Learning rate 0.01 converged fastest with stable behavior.
+Learning rate 0.1 caused instability and fluctuating loss.
+Hence, moderate learning rates lead to optimal convergence.

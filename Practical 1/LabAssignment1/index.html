@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Practical 1</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</head>
+<body>
+<script>
+  // Generate synthetic data
+  const x = tf.linspace(0, 10, 50);
+  const y = x.mul(2).add(1);
+
+  // Build model
+  const model = tf.sequential();
+  model.add(tf.layers.dense({units: 1, inputShape: [1]}));
+
+  model.compile({
+    optimizer: tf.train.sgd(0.1),
+    loss: 'meanSquaredError'
+  });
+
+  async function train() {
+  await model.fit(x, y, { epochs: 50 });
+
+  const preds = model.predict(x);
+
+  const xData = await x.data();
+  const yData = await y.data();
+  const pData = await preds.data();
+
+  console.log("Actual vs Predicted");
+  for (let i = 0; i < 5; i++) {
+    console.log(
+      `x=${xData[i].toFixed(2)} | actual=${yData[i].toFixed(2)} | predicted=${pData[i].toFixed(2)}`
+    );
+  }
+}
+
+
+  train();
+</script>
+</body>
+</html>
