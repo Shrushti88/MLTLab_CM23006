@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tensor Dimensions</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</head>
+<body>
+
+<script>
+    // Scalar (0D tensor)
+    const scalar = tf.scalar(5);
+
+    // Vector (1D tensor)
+    const vector = tf.tensor([1, 2, 3]);
+
+    // Matrix (2D tensor)
+    const matrix = tf.tensor([[1, 2], [3, 4]]);
+
+    // Print tensors
+    scalar.print();
+    vector.print();
+    matrix.print();
+</script>
+
+</body>
+</html>
