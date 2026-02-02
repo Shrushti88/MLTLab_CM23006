@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>MNIST Digit Recognition</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        canvas {
+            border: 2px solid black;
+            background-color: white;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Draw a Digit (0–9)</h2>
+
+<canvas id="canvas" width="280" height="280"></canvas><br><br>
+
+<button onclick="clearCanvas()">Clear</button>
+<button onclick="predictDigit()">Predict</button>
+
+<h3 id="result">Predicted Digit: </h3>
+
+<script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.lineWidth = 15;
+    ctx.lineCap = "round";
+
+    let drawing = false;
+
+    canvas.addEventListener("mousedown", () => drawing = true);
+    canvas.addEventListener("mouseup", () => drawing = false);
+    canvas.addEventListener("mousemove", draw);
+
+    function draw(event) {
+        if (!drawing) return;
+        ctx.lineTo(event.offsetX, event.offsetY);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(event.offsetX, event.offsetY);
+    }
+
+    function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.beginPath();
+        document.getElementById("result").innerText = "Predicted Digit: ";
+    }
+
+    function predictDigit() {
+        document.getElementById("result").innerText =
+            "Predicted Digit: (CNN Model Output)";
+    }
+</script>
+
+</body>
+</html>
