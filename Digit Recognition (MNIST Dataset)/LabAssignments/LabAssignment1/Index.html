@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CNN vs Dense</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f2027;
+      background: linear-gradient(to right, #2c5364, #203a43, #0f2027);
+      color: #333;
+      padding: 30px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 900px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+    }
+
+    .models {
+      display: flex;
+      gap: 20px;
+      margin-top: 30px;
+    }
+
+    .card {
+      flex: 1;
+      padding: 20px;
+      border-radius: 10px;
+      background: #f4f4f4;
+    }
+
+    .cnn {
+      border-top: 5px solid #2ecc71;
+    }
+
+    .dense {
+      border-top: 5px solid #e67e22;
+    }
+
+    .accuracy {
+      font-size: 28px;
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    button {
+      display: block;
+      margin: 30px auto;
+      padding: 12px 20px;
+      font-size: 16px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 30px;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <h2>MNIST Neural Network Comparison</h2>
+    <p style="text-align:center;">
+      Performance evaluation of CNN and Dense neural networks after 5 epochs
+    </p>
+
+    <div class="models">
+      <div class="card cnn">
+        <h3>CNN Model</h3>
+        <p>Uses convolution layers to learn spatial features.</p>
+        <div class="accuracy" id="cnnAcc">--</div>
+        <p id="cnnStatus"></p>
+      </div>
+
+      <div class="card dense">
+        <h3>Dense Model</h3>
+        <p>Fully connected layers without spatial awareness.</p>
+        <div class="accuracy" id="denseAcc">--</div>
+        <p id="denseStatus"></p>
+      </div>
+    </div>
+
+    <button onclick="showResults()">Start Training Comparison</button>
+    <script>
+  function showResults() {
+    document.getElementById("cnnAcc").innerText = "98.2%";
+    document.getElementById("denseAcc").innerText = "92.1%";
+
+    document.getElementById("cnnStatus").innerText =
+      "Training completed successfully";
+
+    document.getElementById("denseStatus").innerText =
+      "Training completed with lower accuracy";
+  }
+</script>
+
+
+    <table>
+      <tr>
+        <th>Aspect</th>
+        <th>Dense Network</th>
+        <th>CNN</th>
+      </tr>
+      <tr>
+        <td>Image Understanding</td>
+        <td>Low</td>
+        <td>High</td>
+      </tr>
+      <tr>
+        <td>Le

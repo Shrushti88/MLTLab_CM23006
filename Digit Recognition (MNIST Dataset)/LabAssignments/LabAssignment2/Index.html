@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Draw Digit</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</head>
+
+<body>
+  <h3>Lab Assignment 2: Draw Digit and Classify</h3>
+
+  <canvas id="canvas" width="280" height="280"
+          style="border:1px solid black;"></canvas><br><br>
+
+  <button onclick="predict()">Predict</button>
+  <p id="result"></p>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "black";
+    ctx.fillRect(0, 0, 280, 280);
+
+    let drawing = false;
+
+    canvas.onmousedown = () => drawing = true;
+    canvas.onmouseup = () => drawing = false;
+    canvas.onmousemove = (e) => {
+      if (!drawing) return;
+      ctx.fillStyle = "white";
+      ctx.beginPath();
+      ctx.arc(e.offsetX, e.offsetY, 10, 0, Math.PI * 2);
+      ctx.fill();
+    };
+
+    const model = tf.sequential();
+    model.add(tf.layers.flatten({ inputShape: [28, 28, 1] }));
+    model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: 10, activation: 'softmax' }));
+    model.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy' });
+
+    function predict() {
+      const img = tf.browser.fromPixels(canvas, 1)
+        .resizeNearestNeighbor([28, 28])
+        .toFloat()
+        .div(255.0)
+        .reshape([1, 28, 28, 1]);
+
+      const prediction = model.predict(img).argMax(1);
+      document.getElementById("result").innerText =
+        "Predicted Digit: " + prediction.dataSync()[0];
+    }
+  </script>
+</body>
+</html>
