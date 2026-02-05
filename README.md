@@ -20,8 +20,7 @@ Each practical is organized in its own folder with source code and documentation
 
 Run the Repository
 
-git clone https://github.com/kanchan874/MLTL_Kanchan.git
-cd MLTL_Kanchan
+git clone https://github.com/Shrushti88/MLTLab_CM23006.git
 
 
 | No. | Practical                             | Overview                                                                          | Link              |
@@ -36,3 +35,9 @@ cd MLTL_Kanchan
 | 8   | Transfer Learning with Images         | Retrain MobileNet on a custom dataset and evaluate model performance.             | [Coming Soon](./Lab8)   |
 | 9   | Real-time Gesture Control             | Control media playback and volume using hand gesture recognition.                 | [Coming Soon](./Lab9)   |
 | 10  | Deploying a Model in Browser          | Save, load, and export trained models for browser-based inference.                | [Coming Soon](./Lab10) |
+
+💡 Highlights
+
+- Fully browser-based ML using TensorFlow.js  
+- Covers regression, CNNs, RNNs, and transfer learning  
+- Real-time applications: pose detection & gesture control  
