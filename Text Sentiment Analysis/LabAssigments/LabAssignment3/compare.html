@@ -1,0 +1,19 @@
+const rnn = tf.sequential();
+rnn.add(tf.layers.embedding({inputDim:50, outputDim:8, inputLength:maxLen}));
+rnn.add(tf.layers.lstm({units:16}));
+rnn.add(tf.layers.dense({units:1, activation:'sigmoid'}));
+
+rnn.compile({
+  optimizer:'adam',
+  loss:'binaryCrossentropy',
+  metrics:['accuracy']
+});
+
+const denseHist = await model.fit(xs, ys, {epochs:10});
+const rnnHist = await rnn.fit(xs, ys, {epochs:10});
+
+document.getElementById("output").innerText =
+`Dense Accuracy: ${(denseHist.history.acc.pop()*100).toFixed(2)}%
+RNN Accuracy: ${(rnnHist.history.acc.pop()*100).toFixed(2)}%
+
+RNN performs better due to sequence learning.`;

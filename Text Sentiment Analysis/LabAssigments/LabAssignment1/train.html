@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Sentiment Training</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+</head>
+<body>
+<h3>Train Sentiment Classifier</h3>
+<pre id="output">Training...</pre>
+
+<script>
+const sentences = [
+  "I love this product",
+  "This is amazing",
+  "I hate this",
+  "Very bad experience",
+  "Absolutely fantastic",
+  "Worst ever"
+];
+
+const labels = [1,1,0,0,1,0]; // 1=positive, 0=negative
+
+const vocab = {};
+sentences.forEach(s =>
+  s.toLowerCase().split(" ").forEach(w => vocab[w] ??= Object.keys(vocab).length + 1)
+);
+
+function encode(text) {
+  return text.toLowerCase().split(" ").map(w => vocab[w] || 0);
+}
+
+const maxLen = 5;
+const xs = tf.tensor2d(
+  sentences.map(s => encode(s).concat(Array(maxLen).fill(0)).slice(0, maxLen))
+);
+const ys = tf.tensor2d(labels, [labels.length, 1]);
+
+const model = tf.sequential();
+model.add(tf.layers.dense({inputShape:[maxLen], units:8, activation:'relu'}));
+model.add(tf.layers.dense({units:1, activation:'sigmoid'}));
+
+model.compile({
+  optimizer:'adam',
+  loss:'binaryCrossentropy',
+  metrics:['accuracy']
+});
+
+(async () => {
+  const h = await model.fit(xs, ys, {epochs:10});
+  document.getElementById("output").innerText =
+    "Final Accuracy: " + (h.history.acc.pop()*100).toFixed(2) + "%";
+})();
+</script>
+</body>
+</html>

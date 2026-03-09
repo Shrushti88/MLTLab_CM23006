@@ -1,0 +1,45 @@
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<script>
+const vocab = {
+  i:1, love:2, this:3, product:4,
+  amazing:5, hate:6, very:7,
+  bad:8, experience:9, absolutely:10,
+  fantastic:11, worst:12, ever:13
+};
+
+const maxLen = 5;
+
+function encode(text) {
+  return text
+    .toLowerCase()
+    .split(" ")
+    .map(w => vocab[w] || 0);
+}
+</script>
+
+<input id="text" placeholder="Enter sentence">
+<button onclick="predict()">Predict</button>
+<p id="result"></p>
+
+<script>
+async function predict() {
+  const text = document.getElementById("textInput").value;
+
+  const encoded = encode(text);
+
+  const padded = encoded.slice(0, maxLen);
+  while (padded.length < maxLen) padded.push(0);
+
+  const inputTensor = tf.tensor2d([padded]);
+
+  const prediction = model.predict(inputTensor);
+  const score = prediction.dataSync()[0];
+
+  const sentiment = score > 0.5 ? "Positive" : "Negative";
+  const confidence = (score * 100).toFixed(2);
+
+  document.getElementById("result").innerText =
+    `Sentiment: ${sentiment} | Confidence: ${confidence}%`;
+}
+</script>
+
