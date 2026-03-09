@@ -1,30 +1,60 @@
 <!DOCTYPE html>
 
-<html>
-
+<html lang="en">
 <head>
-
-<title>RNN vs Dense Comparison</title>
-
+<meta charset="UTF-8">
+<title>Lab 3: RNN vs Dense Comparison</title>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+body{font-family:'Segoe UI';background:#f0f2f5;padding:20px}
+.container{max-width:900px;margin:auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
+.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}
+.model-card{border:1px solid #ddd;padding:15px;border-radius:8px}
+.dense-card{border-top:5px solid #3498db}
+.rnn-card{border-top:5px solid #9b59b6}
+.accuracy{font-size:28px;font-weight:bold;margin:10px 0}
+button{background:#2c3e50;color:white;padding:12px;border:none;border-radius:5px;width:100%;cursor:pointer}
+table{width:100%;border-collapse:collapse;margin-top:20px}
+th,td{padding:12px;border:1px solid #eee}
+th{background:#f8f9fa}
+</style>
 
 </head>
 
 <body>
 
-<h2>RNN vs Dense Network</h2>
+<div class="container">
 
-<button onclick="run()">Train Models</button>
+<h1>Task 3: RNN vs Dense Network</h1>
+<p>Compare performance of Dense Network and Recurrent Neural Network for sentiment classification.</p>
 
-<h3>Dense Accuracy: <span id="dense">--</span></h3>
+<button id="run-btn">Train & Compare Models</button>
 
-<h3>RNN Accuracy: <span id="rnn">--</span></h3>
+<div class="comparison-grid">
 
-<table border="1">
+<div class="model-card dense-card">
+<h3>Dense Network</h3>
+<p>Embedding → Flatten → Dense</p>
+<div id="dense-acc" class="accuracy">--%</div>
+<p id="dense-status">Status: Idle</p>
+</div>
 
+<div class="model-card rnn-card">
+<h3>Recurrent Neural Network</h3>
+<p>Embedding → SimpleRNN → Dense</p>
+<div id="rnn-acc" class="accuracy">--%</div>
+<p id="rnn-status">Status: Idle</p>
+</div>
+
+</div>
+
+<h2>Architecture Comparison</h2>
+
+<table>
 <tr>
 <th>Feature</th>
-<th>Dense</th>
+<th>Dense Network</th>
 <th>RNN</th>
 </tr>
 
@@ -36,44 +66,49 @@
 
 <tr>
 <td>Memory</td>
-<td>None</td>
-<td>Stores sequence context</td>
+<td>No memory</td>
+<td>Uses hidden state to remember sequence</td>
 </tr>
 
 <tr>
-<td>Complexity</td>
-<td>Low</td>
-<td>Higher</td>
+<td>Training Complexity</td>
+<td>Fast</td>
+<td>Slower</td>
 </tr>
 
 </table>
 
+</div>
+
 <script>
 
+// Dataset
 const sentences=[
 "i love this",
-"amazing work",
-"fantastic day",
-"great product",
+"amazing great work",
+"happy wonderful",
+"fantastic excellent",
 "i hate this",
-"bad experience",
-"terrible service",
-"awful quality"
+"terrible bad",
+"awful poor",
+"disappointed worst"
 ];
 
 const labels=[1,1,1,1,0,0,0,0];
 
+// Vocabulary
 const words=[...new Set(sentences.flatMap(s=>s.split(" ")))];
 
 const vocab=Object.fromEntries(words.map((w,i)=>[w,i+1]));
 
-const maxLen=3;
-
 const vocabSize=words.length+1;
 
-function encode(t){
+const maxLen=3;
 
-let tokens=t.split(" ").map(w=>vocab[w]||0);
+// Encoding function
+function encode(text){
+
+let tokens=text.toLowerCase().split(" ").map(w=>vocab[w]||0);
 
 if(tokens.length<maxLen){
 tokens=[...tokens,...Array(maxLen-tokens.length).fill(0)];
@@ -83,60 +118,99 @@ return tokens.slice(0,maxLen);
 
 }
 
+// Create tensors
 const xs=tf.tensor2d(sentences.map(s=>encode(s)));
 
 const ys=tf.tensor2d(labels.map(l=>[l]));
 
-function denseModel(){
+// Dense Model
+function createDenseModel(){
 
-const m=tf.sequential();
+const model=tf.sequential();
 
-m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+model.add(tf.layers.embedding({
+inputDim:vocabSize,
+outputDim:8,
+inputLength:maxLen
+}));
 
-m.add(tf.layers.flatten());
+model.add(tf.layers.flatten());
 
-m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
+model.add(tf.layers.dense({
+units:1,
+activation:"sigmoid"
+}));
 
-m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
+model.compile({
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
+});
 
-return m;
-
-}
-
-function rnnModel(){
-
-const m=tf.sequential();
-
-m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
-
-m.add(tf.layers.simpleRNN({units:8}));
-
-m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
-
-m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
-
-return m;
+return model;
 
 }
 
-async function run(){
+// RNN Model
+function createRNNModel(){
 
-let d=denseModel();
+const model=tf.sequential();
 
-let r=rnnModel();
+model.add(tf.layers.embedding({
+inputDim:vocabSize,
+outputDim:8,
+inputLength:maxLen
+}));
 
-let dh=await d.fit(xs,ys,{epochs:30});
+model.add(tf.layers.simpleRNN({
+units:8
+}));
 
-let rh=await r.fit(xs,ys,{epochs:30});
+model.add(tf.layers.dense({
+units:1,
+activation:"sigmoid"
+}));
 
-document.getElementById("dense").innerText=(dh.history.acc.slice(-1)[0]*100).toFixed(1)+"%";
+model.compile({
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
+});
 
-document.getElementById("rnn").innerText=(rh.history.acc.slice(-1)[0]*100).toFixed(1)+"%";
+return model;
 
 }
+
+// Training
+document.getElementById("run-btn").onclick=async()=>{
+
+const denseModel=createDenseModel();
+const rnnModel=createRNNModel();
+
+document.getElementById("dense-status").innerText="Training...";
+document.getElementById("rnn-status").innerText="Waiting...";
+
+// Train Dense
+const denseHist=await denseModel.fit(xs,ys,{epochs:30});
+
+const denseAcc=(denseHist.history.accuracy.slice(-1)[0]*100).toFixed(2);
+
+document.getElementById("dense-acc").innerText=denseAcc+"%";
+document.getElementById("dense-status").innerText="Complete";
+
+// Train RNN
+document.getElementById("rnn-status").innerText="Training...";
+
+const rnnHist=await rnnModel.fit(xs,ys,{epochs:30});
+
+const rnnAcc=(rnnHist.history.accuracy.slice(-1)[0]*100).toFixed(2);
+
+document.getElementById("rnn-acc").innerText=rnnAcc+"%";
+document.getElementById("rnn-status").innerText="Complete";
+
+};
 
 </script>
 
 </body>
-
 </html>
