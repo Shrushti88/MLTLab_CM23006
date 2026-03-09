@@ -1,55 +1,114 @@
 <!DOCTYPE html>
-<html>
+
+<html lang="en">
 <head>
-  <title>Sentiment Training</title>
-  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+<meta charset="UTF-8">
+<title>Lab 5: Sentiment Classifier Training</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+<style>
+body{font-family:'Segoe UI';padding:20px}
+.container{max-width:800px;margin:auto}
+.log{background:#2c3e50;color:white;height:200px;overflow:auto;padding:10px}
+button{padding:10px 20px;background:#3498db;color:white;border:none;border-radius:5px}
+</style>
+
 </head>
+
 <body>
-<h3>Train Sentiment Classifier</h3>
-<pre id="output">Training...</pre>
+
+<div class="container">
+
+<h2>Sentiment Classifier Training</h2>
+
+<button id="trainBtn">Start Training</button>
+
+<p id="status">Status: Ready</p>
+
+<div id="log" class="log"></div>
+
+</div>
 
 <script>
-const sentences = [
-  "I love this product",
-  "This is amazing",
-  "I hate this",
-  "Very bad experience",
-  "Absolutely fantastic",
-  "Worst ever"
+
+const dataset=[
+{text:"i love this product",label:1},
+{text:"this is amazing",label:1},
+{text:"great experience",label:1},
+{text:"fantastic service",label:1},
+{text:"i hate this",label:0},
+{text:"very bad quality",label:0},
+{text:"terrible experience",label:0},
+{text:"awful product",label:0}
 ];
 
-const labels = [1,1,0,0,1,0]; // 1=positive, 0=negative
+const words=[...new Set(dataset.flatMap(d=>d.text.split(" ")))];
 
-const vocab = {};
-sentences.forEach(s =>
-  s.toLowerCase().split(" ").forEach(w => vocab[w] ??= Object.keys(vocab).length + 1)
-);
+const vocab=Object.fromEntries(words.map((w,i)=>[w,i+1]));
 
-function encode(text) {
-  return text.toLowerCase().split(" ").map(w => vocab[w] || 0);
+const vocabSize=words.length+1;
+
+const maxLen=4;
+
+function encode(text){
+
+let tokens=text.split(" ").map(w=>vocab[w]||0);
+
+if(tokens.length<maxLen){
+
+tokens=[...tokens,...Array(maxLen-tokens.length).fill(0)];
+
+}else{
+
+tokens=tokens.slice(0,maxLen);
+
 }
 
-const maxLen = 5;
-const xs = tf.tensor2d(
-  sentences.map(s => encode(s).concat(Array(maxLen).fill(0)).slice(0, maxLen))
-);
-const ys = tf.tensor2d(labels, [labels.length, 1]);
+return tokens;
+}
 
-const model = tf.sequential();
-model.add(tf.layers.dense({inputShape:[maxLen], units:8, activation:'relu'}));
-model.add(tf.layers.dense({units:1, activation:'sigmoid'}));
+const xs=tf.tensor2d(dataset.map(d=>encode(d.text)));
+
+const ys=tf.tensor2d(dataset.map(d=>[d.label]));
+
+const model=tf.sequential();
+
+model.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+
+model.add(tf.layers.flatten());
+
+model.add(tf.layers.dense({units:1,activation:"sigmoid"}));
 
 model.compile({
-  optimizer:'adam',
-  loss:'binaryCrossentropy',
-  metrics:['accuracy']
+optimizer:"adam",
+loss:"binaryCrossentropy",
+metrics:["accuracy"]
 });
 
-(async () => {
-  const h = await model.fit(xs, ys, {epochs:10});
-  document.getElementById("output").innerText =
-    "Final Accuracy: " + (h.history.acc.pop()*100).toFixed(2) + "%";
-})();
+const log=document.getElementById("log");
+
+document.getElementById("trainBtn").onclick=async()=>{
+
+document.getElementById("status").innerText="Training...";
+
+await model.fit(xs,ys,{
+epochs:50,
+callbacks:{
+onEpochEnd:(epoch,logs)=>{
+log.innerHTML+=`Epoch ${epoch+1} | loss:${logs.loss.toFixed(4)} | acc:${logs.acc.toFixed(4)}<br>`;
+log.scrollTop=log.scrollHeight;
+}
+}
+});
+
+document.getElementById("status").innerText="Training Complete";
+
+window.sentimentModel=model;
+
+};
+
 </script>
+
 </body>
 </html>

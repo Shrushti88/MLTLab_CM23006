@@ -1,19 +1,142 @@
-const rnn = tf.sequential();
-rnn.add(tf.layers.embedding({inputDim:50, outputDim:8, inputLength:maxLen}));
-rnn.add(tf.layers.lstm({units:16}));
-rnn.add(tf.layers.dense({units:1, activation:'sigmoid'}));
+<!DOCTYPE html>
 
-rnn.compile({
-  optimizer:'adam',
-  loss:'binaryCrossentropy',
-  metrics:['accuracy']
-});
+<html>
 
-const denseHist = await model.fit(xs, ys, {epochs:10});
-const rnnHist = await rnn.fit(xs, ys, {epochs:10});
+<head>
 
-document.getElementById("output").innerText =
-`Dense Accuracy: ${(denseHist.history.acc.pop()*100).toFixed(2)}%
-RNN Accuracy: ${(rnnHist.history.acc.pop()*100).toFixed(2)}%
+<title>RNN vs Dense Comparison</title>
 
-RNN performs better due to sequence learning.`;
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+
+</head>
+
+<body>
+
+<h2>RNN vs Dense Network</h2>
+
+<button onclick="run()">Train Models</button>
+
+<h3>Dense Accuracy: <span id="dense">--</span></h3>
+
+<h3>RNN Accuracy: <span id="rnn">--</span></h3>
+
+<table border="1">
+
+<tr>
+<th>Feature</th>
+<th>Dense</th>
+<th>RNN</th>
+</tr>
+
+<tr>
+<td>Word Order</td>
+<td>Ignored</td>
+<td>Maintained</td>
+</tr>
+
+<tr>
+<td>Memory</td>
+<td>None</td>
+<td>Stores sequence context</td>
+</tr>
+
+<tr>
+<td>Complexity</td>
+<td>Low</td>
+<td>Higher</td>
+</tr>
+
+</table>
+
+<script>
+
+const sentences=[
+"i love this",
+"amazing work",
+"fantastic day",
+"great product",
+"i hate this",
+"bad experience",
+"terrible service",
+"awful quality"
+];
+
+const labels=[1,1,1,1,0,0,0,0];
+
+const words=[...new Set(sentences.flatMap(s=>s.split(" ")))];
+
+const vocab=Object.fromEntries(words.map((w,i)=>[w,i+1]));
+
+const maxLen=3;
+
+const vocabSize=words.length+1;
+
+function encode(t){
+
+let tokens=t.split(" ").map(w=>vocab[w]||0);
+
+if(tokens.length<maxLen){
+tokens=[...tokens,...Array(maxLen-tokens.length).fill(0)];
+}
+
+return tokens.slice(0,maxLen);
+
+}
+
+const xs=tf.tensor2d(sentences.map(s=>encode(s)));
+
+const ys=tf.tensor2d(labels.map(l=>[l]));
+
+function denseModel(){
+
+const m=tf.sequential();
+
+m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+
+m.add(tf.layers.flatten());
+
+m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
+
+m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
+
+return m;
+
+}
+
+function rnnModel(){
+
+const m=tf.sequential();
+
+m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+
+m.add(tf.layers.simpleRNN({units:8}));
+
+m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
+
+m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
+
+return m;
+
+}
+
+async function run(){
+
+let d=denseModel();
+
+let r=rnnModel();
+
+let dh=await d.fit(xs,ys,{epochs:30});
+
+let rh=await r.fit(xs,ys,{epochs:30});
+
+document.getElementById("dense").innerText=(dh.history.acc.slice(-1)[0]*100).toFixed(1)+"%";
+
+document.getElementById("rnn").innerText=(rh.history.acc.slice(-1)[0]*100).toFixed(1)+"%";
+
+}
+
+</script>
+
+</body>
+
+</html>
