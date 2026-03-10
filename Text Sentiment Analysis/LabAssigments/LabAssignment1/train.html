@@ -1,110 +1,152 @@
-<!DOCTYPE html>
-
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Lab 5: Sentiment Classifier Training</title>
-
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-
-<style>
-body{font-family:'Segoe UI';padding:20px}
-.container{max-width:800px;margin:auto}
-.log{background:#2c3e50;color:white;height:200px;overflow:auto;padding:10px}
-button{padding:10px 20px;background:#3498db;color:white;border:none;border-radius:5px}
-</style>
-
-</head>
-
 <body>
 
-<div class="container">
+<div class="card">
+<h1>Step 1: Train Classifier</h1>
+<button id="train-btn">Train Models (Dense + RNN)</button>
+<div id="train-status" class="status-box">Waiting to start...</div>
+</div>
 
-<h2>Sentiment Classifier Training</h2>
+<div class="card">
+<h1>Step 2: Test Sentence</h1>
 
-<button id="trainBtn">Start Training</button>
+<input id="user-text" placeholder="Enter sentence" disabled>
 
-<p id="status">Status: Ready</p>
+<button id="predict-btn" disabled style="background:#27ae60">Analyze Sentiment</button>
 
-<div id="log" class="log"></div>
+<div id="results-area" style="display:none">
+
+<div class="score-display" id="final-label">---</div>
+
+<div class="meter-bg">
+<div id="meter-fill"></div>
+</div>
+
+<div style="display:flex;justify-content:space-between;font-size:14px">
+<span>NEGATIVE</span>
+<span id="numeric-score">0.50</span>
+<span>POSITIVE</span>
+</div>
+
+</div>
+</div>
+
+<div class="card">
+<h2>Step 3: Model Comparison</h2>
+
+<p>Dense Accuracy: <b id="dense-acc">--</b></p>
+<p>RNN Accuracy: <b id="rnn-acc">--</b></p>
 
 </div>
 
 <script>
 
-const dataset=[
-{text:"i love this product",label:1},
-{text:"this is amazing",label:1},
-{text:"great experience",label:1},
-{text:"fantastic service",label:1},
-{text:"i hate this",label:0},
-{text:"very bad quality",label:0},
-{text:"terrible experience",label:0},
-{text:"awful product",label:0}
+const rawData=[
+{s:"i love this product",l:1},
+{s:"amazing and great",l:1},
+{s:"excellent happy work",l:1},
+{s:"wonderful fantastic day",l:1},
+{s:"hate this so much",l:0},
+{s:"terrible and bad",l:0},
+{s:"worst ever disappointed",l:0},
+{s:"awful quality poor",l:0}
 ];
 
-const words=[...new Set(dataset.flatMap(d=>d.text.split(" ")))];
-
+const words=[...new Set(rawData.flatMap(d=>d.s.split(" ")))];
 const vocab=Object.fromEntries(words.map((w,i)=>[w,i+1]));
-
 const vocabSize=words.length+1;
-
 const maxLen=4;
 
 function encode(text){
+let tokens=text.toLowerCase().split(" ").map(w=>vocab[w]||0);
+return tokens.length<maxLen?
+[...tokens,...Array(maxLen-tokens.length).fill(0)]
+:tokens.slice(0,maxLen);
+}
 
-let tokens=text.split(" ").map(w=>vocab[w]||0);
+let denseModel;
+let rnnModel;
 
-if(tokens.length<maxLen){
+function buildDense(){
 
-tokens=[...tokens,...Array(maxLen-tokens.length).fill(0)];
+let m=tf.sequential();
 
-}else{
+m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+m.add(tf.layers.flatten());
+m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
 
-tokens=tokens.slice(0,maxLen);
+m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
+
+return m;
 
 }
 
-return tokens;
+function buildRNN(){
+
+let m=tf.sequential();
+
+m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+m.add(tf.layers.simpleRNN({units:8}));
+m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
+
+m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
+
+return m;
+
 }
 
-const xs=tf.tensor2d(dataset.map(d=>encode(d.text)));
+const trainBtn=document.getElementById("train-btn");
 
-const ys=tf.tensor2d(dataset.map(d=>[d.label]));
+trainBtn.onclick=async()=>{
 
-const model=tf.sequential();
+trainBtn.disabled=true;
 
-model.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
+document.getElementById("train-status").innerText="Training models...";
 
-model.add(tf.layers.flatten());
+const xs=tf.tensor2d(rawData.map(d=>encode(d.s)));
+const ys=tf.tensor2d(rawData.map(d=>[d.l]));
 
-model.add(tf.layers.dense({units:1,activation:"sigmoid"}));
+denseModel=buildDense();
+rnnModel=buildRNN();
 
-model.compile({
-optimizer:"adam",
-loss:"binaryCrossentropy",
-metrics:["accuracy"]
-});
+let d=await denseModel.fit(xs,ys,{epochs:50});
+let r=await rnnModel.fit(xs,ys,{epochs:50});
 
-const log=document.getElementById("log");
+let denseAcc=d.history.acc.slice(-1)[0];
+let rnnAcc=r.history.acc.slice(-1)[0];
 
-document.getElementById("trainBtn").onclick=async()=>{
+document.getElementById("dense-acc").innerText=(denseAcc*100).toFixed(2)+"%";
+document.getElementById("rnn-acc").innerText=(rnnAcc*100).toFixed(2)+"%";
 
-document.getElementById("status").innerText="Training...";
+document.getElementById("train-status").innerText="Training Complete";
 
-await model.fit(xs,ys,{
-epochs:50,
-callbacks:{
-onEpochEnd:(epoch,logs)=>{
-log.innerHTML+=`Epoch ${epoch+1} | loss:${logs.loss.toFixed(4)} | acc:${logs.acc.toFixed(4)}<br>`;
-log.scrollTop=log.scrollHeight;
-}
-}
-});
+document.getElementById("user-text").disabled=false;
+document.getElementById("predict-btn").disabled=false;
 
-document.getElementById("status").innerText="Training Complete";
+};
 
-window.sentimentModel=model;
+document.getElementById("predict-btn").onclick=()=>{
+
+const text=document.getElementById("user-text").value;
+
+const input=tf.tensor2d([encode(text)]);
+
+const pred=denseModel.predict(input);
+
+const score=pred.dataSync()[0];
+
+document.getElementById("results-area").style.display="block";
+
+const isPos=score>0.5;
+
+const label=document.getElementById("final-label");
+
+label.innerText=isPos?"POSITIVE":"NEGATIVE";
+label.style.color=isPos?"#27ae60":"#e74c3c";
+
+document.getElementById("meter-fill").style.width=(score*100)+"%";
+document.getElementById("meter-fill").style.background=isPos?"#27ae60":"#e74c3c";
+
+document.getElementById("numeric-score").innerText="Confidence: "+score.toFixed(4);
 
 };
 

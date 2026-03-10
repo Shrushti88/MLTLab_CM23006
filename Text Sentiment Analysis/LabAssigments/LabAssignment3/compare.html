@@ -1,216 +1,343 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Lab 3: RNN vs Dense Comparison</title>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task 3: RNN vs Dense Network Comparison</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #020617, #1e293b);
+            padding: 30px;
+            color: #e2e8f0;
+            margin: 0;
+        }
 
-<style>
-body{font-family:'Segoe UI';background:#f0f2f5;padding:20px}
-.container{max-width:900px;margin:auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.1)}
-.comparison-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0}
-.model-card{border:1px solid #ddd;padding:15px;border-radius:8px}
-.dense-card{border-top:5px solid #3498db}
-.rnn-card{border-top:5px solid #9b59b6}
-.accuracy{font-size:28px;font-weight:bold;margin:10px 0}
-button{background:#2c3e50;color:white;padding:12px;border:none;border-radius:5px;width:100%;cursor:pointer}
-table{width:100%;border-collapse:collapse;margin-top:20px}
-th,td{padding:12px;border:1px solid #eee}
-th{background:#f8f9fa}
-</style>
+        .container {
+            max-width: 900px;
+            margin: auto;
+            background: #0f172a;
+            padding: 35px;
+            border-radius: 18px;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+        }
 
+        h1 {
+            text-align: center;
+            color: #a5b4fc;
+            margin-bottom: 10px;
+        }
+
+        p.intro {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        button {
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: white;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            width: 100%;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.3s;
+            font-family: inherit;
+            font-size: 16px;
+            max-width: 300px;
+            margin: 0 auto 30px;
+            display: block;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(239,68,68,0.6);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 25px 0;
+        }
+
+        .model-card {
+            background: #020617;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #1e293b;
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .model-card:hover {
+            transform: scale(1.02);
+        }
+
+        .dense-card {
+            border-left: 5px solid #38bdf8;
+        }
+
+        .rnn-card {
+            border-left: 5px solid #a855f7;
+        }
+
+        .model-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 20px;
+        }
+
+        .model-card p {
+            color: #94a3b8;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .accuracy {
+            font-size: 30px;
+            font-weight: bold;
+            margin: 12px 0;
+        }
+
+        .status {
+            font-size: 14px;
+            margin: 10px 0 0 0;
+            padding: 6px 12px;
+            border-radius: 20px;
+            display: inline-block;
+            font-weight: 500;
+        }
+
+        .status.training { background: #f59e0b; color: white; }
+        .status.complete { background: #10b981; color: white; }
+        .status.idle { background: #475569; color: #e2e8f0; }
+
+        h2 {
+            color: #a5b4fc;
+            margin: 40px 0 20px 0;
+            text-align: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 25px;
+            background: #020617;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        th {
+            background: #020617;
+            color: #a5b4fc;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background: rgba(26, 32, 44, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            body { padding: 20px; }
+            .container { padding: 25px; }
+        }
+    </style>
 </head>
-
 <body>
+    <div class="container">
+        <h1>Task 3: RNN vs Dense Network</h1>
+        <p class="intro">Compare performance of Dense Network and Recurrent Neural Network for sentiment classification on short reviews.</p>
 
-<div class="container">
+        <button id="run-btn">🚀 Train & Compare Models</button>
 
-<h1>Task 3: RNN vs Dense Network</h1>
-<p>Compare performance of Dense Network and Recurrent Neural Network for sentiment classification.</p>
+        <div class="comparison-grid">
+            <div class="model-card dense-card">
+                <h3>Dense Network</h3>
+                <p>Embedding → GlobalAvgPool → Dense</p>
+                <div id="dense-acc" class="accuracy">--</div>
+                <p id="dense-status" class="status idle">Status: Idle</p>
+            </div>
 
-<button id="run-btn">Train & Compare Models</button>
+            <div class="model-card rnn-card">
+                <h3>Recurrent Neural Network</h3>
+                <p>Embedding → SimpleRNN → Dense</p>
+                <div id="rnn-acc" class="accuracy">--</div>
+                <p id="rnn-status" class="status idle">Status: Idle</p>
+            </div>
+        </div>
 
-<div class="comparison-grid">
+        <h2>Architecture Comparison</h2>
 
-<div class="model-card dense-card">
-<h3>Dense Network</h3>
-<p>Embedding → Flatten → Dense</p>
-<div id="dense-acc" class="accuracy">--%</div>
-<p id="dense-status">Status: Idle</p>
-</div>
+        <table>
+            <tr>
+                <th>Feature</th>
+                <th>Dense Network</th>
+                <th>RNN</th>
+            </tr>
+            <tr>
+                <td><strong>Word Order</strong></td>
+                <td>Ignored (bag-of-words)</td>
+                <td>Maintained (sequential)</td>
+            </tr>
+            <tr>
+                <td><strong>Memory</strong></td>
+                <td>No memory between words</td>
+                <td>Hidden state remembers sequence</td>
+            </tr>
+            <tr>
+                <td><strong>Training Speed</strong></td>
+                <td>Fast</td>
+                <td>Slower due to recurrence</td>
+            </tr>
+            <tr>
+                <td><strong>Best For</strong></td>
+                <td>Short, independent features</td>
+                <td>Sequential patterns</td>
+            </tr>
+        </table>
+    </div>
 
-<div class="model-card rnn-card">
-<h3>Recurrent Neural Network</h3>
-<p>Embedding → SimpleRNN → Dense</p>
-<div id="rnn-acc" class="accuracy">--%</div>
-<p id="rnn-status">Status: Idle</p>
-</div>
+    <script>
+        // Dataset - balanced positive/negative short sentences
+        const sentences = [
+            "i love this", "amazing great work", "happy wonderful", "fantastic excellent",
+            "i hate this", "terrible bad", "awful poor", "disappointed worst"
+        ];
+        const labels = [1, 1, 1, 1, 0, 0, 0, 0];
 
-</div>
+        // Build vocabulary (word -> index)
+        const words = [...new Set(sentences.flatMap(s => s.toLowerCase().split(' ')))];
+        const vocab = Object.fromEntries(words.map((w, i) => [w, i + 1]));
+        const vocabSize = words.length + 1; // +1 for 0 (padding/OOV)
+        const maxLen = 3;
 
-<h2>Architecture Comparison</h2>
+        // Encode sentence to fixed-length tensor input
+        function encode(text) {
+            let tokens = text.toLowerCase().split(' ').map(w => vocab[w] || 0);
+            if (tokens.length < maxLen) {
+                tokens = [...tokens, ...Array(maxLen - tokens.length).fill(0)];
+            } else {
+                tokens = tokens.slice(0, maxLen);
+            }
+            return tokens;
+        }
 
-<table>
-<tr>
-<th>Feature</th>
-<th>Dense Network</th>
-<th>RNN</th>
-</tr>
+        // Pre-compute training tensors (shared between models)
+        let xs, ys;
+        function prepareData() {
+            xs = tf.tensor2d(sentences.map(s => encode(s)));
+            ys = tf.tensor2d(labels.map(l => [l]));
+        }
 
-<tr>
-<td>Word Order</td>
-<td>Ignored</td>
-<td>Maintained</td>
-</tr>
+        // Dense Model: treats sequence as fixed bag-of-words
+        function createDenseModel() {
+            const model = tf.sequential();
+            model.add(tf.layers.embedding({inputDim: vocabSize, outputDim: 8, inputLength: maxLen}));
+            model.add(tf.layers.globalAveragePooling1d()); // Improved vs flatten()
+            model.add(tf.layers.dense({units: 16, activation: 'relu'}));
+            model.add(tf.layers.dropout({rate: 0.2}));
+            model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+            model.compile({
+                optimizer: 'adam',
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            return model;
+        }
 
-<tr>
-<td>Memory</td>
-<td>No memory</td>
-<td>Uses hidden state to remember sequence</td>
-</tr>
+        // RNN Model: processes sequence with memory
+        function createRNNModel() {
+            const model = tf.sequential();
+            model.add(tf.layers.embedding({inputDim: vocabSize, outputDim: 8, inputLength: maxLen}));
+            model.add(tf.layers.simpleRNN({units: 16, returnSequences: false}));
+            model.add(tf.layers.dropout({rate: 0.2}));
+            model.add(tf.layers.dense({units: 1, activation: 'sigmoid'}));
+            model.compile({
+                optimizer: 'adam',
+                loss: 'binaryCrossentropy',
+                metrics: ['accuracy']
+            });
+            return model;
+        }
 
-<tr>
-<td>Training Complexity</td>
-<td>Fast</td>
-<td>Slower</td>
-</tr>
+        // UI Elements
+        const runBtn = document.getElementById('run-btn');
+        const denseAccEl = document.getElementById('dense-acc');
+        const rnnAccEl = document.getElementById('rnn-acc');
+        const denseStatusEl = document.getElementById('dense-status');
+        const rnnStatusEl = document.getElementById('rnn-status');
 
-</table>
+        runBtn.onclick = async () => {
+            runBtn.disabled = true;
+            runBtn.innerText = 'Training in progress...';
 
-</div>
+            prepareData();
 
-<script>
+            let denseModel, rnnModel;
 
-// Dataset
-const sentences=[
-"i love this",
-"amazing great work",
-"happy wonderful",
-"fantastic excellent",
-"i hate this",
-"terrible bad",
-"awful poor",
-"disappointed worst"
-];
+            try {
+                // Train Dense first
+                denseStatusEl.innerText = 'Training...';
+                denseStatusEl.className = 'status training';
+                rnnStatusEl.innerText = 'Waiting...';
 
-const labels=[1,1,1,1,0,0,0,0];
+                denseModel = createDenseModel();
+                const denseHist = await denseModel.fit(xs, ys, {epochs: 80, batchSize: 4, verbose: 0});
+                const denseAcc = (denseHist.history.acc[denseHist.history.acc.length - 1] * 100).toFixed(1);
 
-// Vocabulary
-const words=[...new Set(sentences.flatMap(s=>s.split(" ")))];
+                denseAccEl.innerText = denseAcc + '%';
+                denseStatusEl.innerText = 'Complete';
+                denseStatusEl.className = 'status complete';
 
-const vocab=Object.fromEntries(words.map((w,i)=>[w,i+1]));
+                // Train RNN
+                rnnStatusEl.innerText = 'Training...';
+                rnnStatusEl.className = 'status training';
 
-const vocabSize=words.length+1;
+                rnnModel = createRNNModel();
+                const rnnHist = await rnnModel.fit(xs, ys, {epochs: 80, batchSize: 4, verbose: 0});
+                const rnnAcc = (rnnHist.history.acc[rnnHist.history.acc.length - 1] * 100).toFixed(1);
 
-const maxLen=3;
+                rnnAccEl.innerText = rnnAcc + '%';
+                rnnStatusEl.innerText = 'Complete';
+                rnnStatusEl.className = 'status complete';
 
-// Encoding function
-function encode(text){
+                runBtn.innerText = '🔄 Retrain Models';
 
-let tokens=text.toLowerCase().split(" ").map(w=>vocab[w]||0);
-
-if(tokens.length<maxLen){
-tokens=[...tokens,...Array(maxLen-tokens.length).fill(0)];
-}
-
-return tokens.slice(0,maxLen);
-
-}
-
-// Create tensors
-const xs=tf.tensor2d(sentences.map(s=>encode(s)));
-
-const ys=tf.tensor2d(labels.map(l=>[l]));
-
-// Dense Model
-function createDenseModel(){
-
-const model=tf.sequential();
-
-model.add(tf.layers.embedding({
-inputDim:vocabSize,
-outputDim:8,
-inputLength:maxLen
-}));
-
-model.add(tf.layers.flatten());
-
-model.add(tf.layers.dense({
-units:1,
-activation:"sigmoid"
-}));
-
-model.compile({
-optimizer:"adam",
-loss:"binaryCrossentropy",
-metrics:["accuracy"]
-});
-
-return model;
-
-}
-
-// RNN Model
-function createRNNModel(){
-
-const model=tf.sequential();
-
-model.add(tf.layers.embedding({
-inputDim:vocabSize,
-outputDim:8,
-inputLength:maxLen
-}));
-
-model.add(tf.layers.simpleRNN({
-units:8
-}));
-
-model.add(tf.layers.dense({
-units:1,
-activation:"sigmoid"
-}));
-
-model.compile({
-optimizer:"adam",
-loss:"binaryCrossentropy",
-metrics:["accuracy"]
-});
-
-return model;
-
-}
-
-// Training
-document.getElementById("run-btn").onclick=async()=>{
-
-const denseModel=createDenseModel();
-const rnnModel=createRNNModel();
-
-document.getElementById("dense-status").innerText="Training...";
-document.getElementById("rnn-status").innerText="Waiting...";
-
-// Train Dense
-const denseHist=await denseModel.fit(xs,ys,{epochs:30});
-
-const denseAcc=(denseHist.history.accuracy.slice(-1)[0]*100).toFixed(2);
-
-document.getElementById("dense-acc").innerText=denseAcc+"%";
-document.getElementById("dense-status").innerText="Complete";
-
-// Train RNN
-document.getElementById("rnn-status").innerText="Training...";
-
-const rnnHist=await rnnModel.fit(xs,ys,{epochs:30});
-
-const rnnAcc=(rnnHist.history.accuracy.slice(-1)[0]*100).toFixed(2);
-
-document.getElementById("rnn-acc").innerText=rnnAcc+"%";
-document.getElementById("rnn-status").innerText="Complete";
-
-};
-
-</script>
-
+            } catch (error) {
+                console.error('Training failed:', error);
+                denseStatusEl.innerText = 'Error';
+                rnnStatusEl.innerText = 'Error';
+            } finally {
+                if (xs) xs.dispose();
+                if (ys) ys.dispose();
+                if (denseModel) denseModel.dispose();
+                if (rnnModel) rnnModel.dispose();
+                runBtn.disabled = false;
+            }
+        };
+    </script>
 </body>
 </html>

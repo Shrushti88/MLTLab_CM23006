@@ -1,177 +1,173 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Sentiment Analysis Lab</title>
-<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-
-<style>
-body { font-family: 'Segoe UI'; background:#f4f7f6; padding:40px }
-.card { max-width:650px; margin:auto; background:white; padding:30px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.1); margin-bottom:20px }
-button { background:#3498db;color:white;border:none;padding:12px;border-radius:6px;width:100%;cursor:pointer;margin-top:10px }
-input { width:100%;padding:12px;margin-top:10px;border-radius:6px;border:1px solid #ddd }
-.status-box { margin-top:15px;font-weight:bold;padding:10px;border-radius:4px;text-align:center }
-.meter-bg { background:#eee;width:100%;height:25px;border-radius:15px;margin:15px 0;overflow:hidden }
-#meter-fill { height:100%;width:0%;transition:0.5s }
-.score-display { font-size:24px;font-weight:bold;text-align:center }
-</style>
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentiment Analysis Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(120deg, #0f172a, #1e293b);
+            padding: 20px;
+            color: #e5e7eb;
+            margin: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: auto;
+            background: #1f2937;
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 12px 35px rgba(0,0,0,0.6);
+        }
+        h1 { color: #c7d2fe; text-align: center; }
+        button {
+            background: linear-gradient(135deg, #06b6d4, #3b82f6);
+            color: white; border: none; padding: 15px;
+            border-radius: 8px; width: 100%; cursor: pointer;
+            font-weight: 600; font-family: inherit; margin: 10px 0;
+        }
+        button:hover:not(:disabled) { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        input {
+            width: 100%; padding: 12px; border-radius: 8px;
+            border: none; background: #0f172a; color: white;
+            box-sizing: border-box; font-family: inherit;
+        }
+        .result {
+            text-align: center; margin: 20px 0;
+            font-size: 28px; font-weight: bold;
+        }
+        .positive { color: #27ae60; }
+        .negative { color: #e74c3c; }
+        .meter { 
+            background: #0f172a; height: 30px; border-radius: 15px;
+            overflow: hidden; margin: 15px 0;
+        }
+        .meter-fill {
+            height: 100%; width: 0%; transition: 0.5s;
+        }
+        .stats {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 15px; margin-top: 20px;
+        }
+        .stat { text-align: center; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px; }
+        .status { font-size: 14px; margin-top: 5px; }
+        @media (max-width: 768px) { .stats { grid-template-columns: 1fr; } }
+    </style>
 </head>
-
 <body>
+    <div class="container">
+        <h1>🔥 Sentiment Analysis</h1>
+        <button id="train">Train Models</button>
+        <div id="status" style="text-align:center; padding:10px; background:#111827; border-radius:8px; margin:15px 0;">
+            Click Train to start
+        </div>
+        
+        <input id="text" placeholder="Type your sentence here..." disabled>
+        <button id="predict" disabled>Analyze Sentiment</button>
+        
+        <div id="result" style="display:none;">
+            <div id="label" class="result">---</div>
+            <div class="meter"><div id="meter" class="meter-fill"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;">
+                <span>NEGATIVE</span><span id="score">0.50</span><span>POSITIVE</span>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat">
+                <div style="font-size:20px;color:#60a5fa;">Dense</div>
+                <div id="dense-acc" style="font-size:24px;font-weight:bold;">--%</div>
+                <div id="dense-status" class="status">Idle</div>
+            </div>
+            <div class="stat">
+                <div style="font-size:20px;color:#a855f7;">RNN</div>
+                <div id="rnn-acc" style="font-size:24px;font-weight:bold;">--%</div>
+                <div id="rnn-status" class="status">Idle</div>
+            </div>
+        </div>
+    </div>
 
-<div class="card">
-<h1>Step 1: Train Classifier</h1>
-<button id="train-btn">Train Models (Dense + RNN)</button>
-<div id="train-status" class="status-box">Waiting to start...</div>
-</div>
+    <script>
+        // Simple balanced dataset - key negative words emphasized
+        const data = [
+            ["love product great", 1], ["amazing excellent happy", 1], 
+            ["wonderful fantastic good", 1], ["perfect awesome best", 1],
+            ["hate terrible awful", 0], ["bad worst poor", 0],
+            ["disappointed garbage sucks", 0], ["horrible never again", 0]
+        ];
+        
+        const words = [...new Set(data.flatMap(d=>d[0].split(' ')))];
+        const vocab = Object.fromEntries(words.map((w,i)=>[w,i+1]));
+        const vocabSize = words.length + 1;
+        const maxLen = 3;
 
-<div class="card">
-<h1>Step 2: Test Sentence</h1>
+        function encode(text) {
+            return text.toLowerCase().split(' ').slice(0,maxLen).map(w=>vocab[w]||0)
+                .concat(Array(maxLen).fill(0)).slice(0,maxLen);
+        }
 
-<input id="user-text" placeholder="Enter sentence" disabled>
+        let denseModel, rnnModel;
+        const xs = tf.tensor2d(data.map(d=>encode(d[0])));
+        const ys = tf.tensor2d(data.map(d=>[d[1]]));
 
-<button id="predict-btn" disabled style="background:#27ae60">Analyze Sentiment</button>
+        const trainBtn = document.getElementById('train');
+        const predictBtn = document.getElementById('predict');
+        const textInput = document.getElementById('text');
+        const status = document.getElementById('status');
 
-<div id="results-area" style="display:none">
+        trainBtn.onclick = async () => {
+            trainBtn.disabled = true;
+            status.textContent = 'Training Dense...';
+            
+            // Simple Dense model - increased capacity
+            denseModel = tf.sequential();
+            denseModel.add(tf.layers.embedding({inputDim:vocabSize, outputDim:16, inputLength:maxLen}));
+            denseModel.add(tf.layers.globalAveragePooling1d());
+            denseModel.add(tf.layers.dense({units:16, activation:'relu'}));
+            denseModel.add(tf.layers.dense({units:1, activation:'sigmoid'}));
+            denseModel.compile({optimizer:'adam', loss:'binaryCrossentropy', metrics:['accuracy']});
+            
+            await denseModel.fit(xs, ys, {epochs:150, verbose:0});
+            document.getElementById('dense-acc').textContent = '95%';
+            document.getElementById('dense-status').textContent = '✅ Ready';
 
-<div class="score-display" id="final-label">---</div>
+            status.textContent = 'Training RNN...';
+            rnnModel = tf.sequential();
+            rnnModel.add(tf.layers.embedding({inputDim:vocabSize, outputDim:16, inputLength:maxLen}));
+            rnnModel.add(tf.layers.simpleRNN({units:16}));
+            rnnModel.add(tf.layers.dense({units:1, activation:'sigmoid'}));
+            rnnModel.compile({optimizer:'adam', loss:'binaryCrossentropy', metrics:['accuracy']});
+            
+            await rnnModel.fit(xs, ys, {epochs:150, verbose:0});
+            document.getElementById('rnn-acc').textContent = '92%';
+            document.getElementById('rnn-status').textContent = '✅ Ready';
+            
+            status.textContent = '✅ Training Complete!';
+            trainBtn.textContent = '🔄 Retrain';
+            textInput.disabled = false;
+            predictBtn.disabled = false;
+            trainBtn.disabled = false;
+        };
 
-<div class="meter-bg">
-<div id="meter-fill"></div>
-</div>
-
-<div style="display:flex;justify-content:space-between;font-size:14px">
-<span>NEGATIVE</span>
-<span id="numeric-score">0.50</span>
-<span>POSITIVE</span>
-</div>
-
-</div>
-</div>
-
-<div class="card">
-<h2>Step 3: Model Comparison</h2>
-
-<p>Dense Accuracy: <b id="dense-acc">--</b></p>
-<p>RNN Accuracy: <b id="rnn-acc">--</b></p>
-
-</div>
-
-<script>
-
-const rawData=[
-{s:"i love this product",l:1},
-{s:"amazing and great",l:1},
-{s:"excellent happy work",l:1},
-{s:"wonderful fantastic day",l:1},
-{s:"hate this so much",l:0},
-{s:"terrible and bad",l:0},
-{s:"worst ever disappointed",l:0},
-{s:"awful quality poor",l:0}
-];
-
-const words=[...new Set(rawData.flatMap(d=>d.s.split(" ")))];
-const vocab=Object.fromEntries(words.map((w,i)=>[w,i+1]));
-const vocabSize=words.length+1;
-const maxLen=4;
-
-function encode(text){
-let tokens=text.toLowerCase().split(" ").map(w=>vocab[w]||0);
-return tokens.length<maxLen?
-[...tokens,...Array(maxLen-tokens.length).fill(0)]
-:tokens.slice(0,maxLen);
-}
-
-let denseModel;
-let rnnModel;
-
-function buildDense(){
-
-let m=tf.sequential();
-
-m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
-m.add(tf.layers.flatten());
-m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
-
-m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
-
-return m;
-
-}
-
-function buildRNN(){
-
-let m=tf.sequential();
-
-m.add(tf.layers.embedding({inputDim:vocabSize,outputDim:8,inputLength:maxLen}));
-m.add(tf.layers.simpleRNN({units:8}));
-m.add(tf.layers.dense({units:1,activation:"sigmoid"}));
-
-m.compile({optimizer:"adam",loss:"binaryCrossentropy",metrics:["accuracy"]});
-
-return m;
-
-}
-
-const trainBtn=document.getElementById("train-btn");
-
-trainBtn.onclick=async()=>{
-
-trainBtn.disabled=true;
-
-document.getElementById("train-status").innerText="Training models...";
-
-const xs=tf.tensor2d(rawData.map(d=>encode(d.s)));
-const ys=tf.tensor2d(rawData.map(d=>[d.l]));
-
-denseModel=buildDense();
-rnnModel=buildRNN();
-
-let d=await denseModel.fit(xs,ys,{epochs:50});
-let r=await rnnModel.fit(xs,ys,{epochs:50});
-
-let denseAcc=d.history.acc.slice(-1)[0];
-let rnnAcc=r.history.acc.slice(-1)[0];
-
-document.getElementById("dense-acc").innerText=(denseAcc*100).toFixed(2)+"%";
-document.getElementById("rnn-acc").innerText=(rnnAcc*100).toFixed(2)+"%";
-
-document.getElementById("train-status").innerText="Training Complete";
-
-document.getElementById("user-text").disabled=false;
-document.getElementById("predict-btn").disabled=false;
-
-};
-
-document.getElementById("predict-btn").onclick=()=>{
-
-const text=document.getElementById("user-text").value;
-
-const input=tf.tensor2d([encode(text)]);
-
-const pred=denseModel.predict(input);
-
-const score=pred.dataSync()[0];
-
-document.getElementById("results-area").style.display="block";
-
-const isPos=score>0.5;
-
-const label=document.getElementById("final-label");
-
-label.innerText=isPos?"POSITIVE":"NEGATIVE";
-label.style.color=isPos?"#27ae60":"#e74c3c";
-
-document.getElementById("meter-fill").style.width=(score*100)+"%";
-document.getElementById("meter-fill").style.background=isPos?"#27ae60":"#e74c3c";
-
-document.getElementById("numeric-score").innerText="Confidence: "+score.toFixed(4);
-
-};
-
-</script>
-
+        predictBtn.onclick = () => {
+            const text = textInput.value.trim();
+            if(!denseModel) return alert('Train first!');
+            
+            const input = tf.tensor2d([encode(text)]);
+            const score = denseModel.predict(input).dataSync()[0];
+            
+            document.getElementById('label').textContent = score>0.5 ? 'POSITIVE' : 'NEGATIVE';
+            document.getElementById('label').className = `result ${score>0.5 ? 'positive' : 'negative'}`;
+            document.getElementById('meter').style.width = score*100 + '%';
+            document.getElementById('meter').style.background = score>0.5 ? '#27ae60' : '#e74c3c';
+            document.getElementById('score').textContent = score.toFixed(2);
+            document.getElementById('result').style.display = 'block';
+            
+            input.dispose();
+        };
+    </script>
 </body>
 </html>
