@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Lab 1 — CNN Training · MNIST</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px; max-width: 680px; margin: auto; }
+    h1 { color: #333; margin-bottom: 6px; }
+    p { color: #666; margin-bottom: 20px; }
+    button { padding: 12px 28px; background: #6c47ff; color: #fff; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .progress-wrap { margin-top: 14px; background: #ddd; border-radius: 6px; height: 8px; }
+    #progress-bar { height: 8px; width: 0%; background: #6c47ff; border-radius: 6px; transition: width 0.2s; }
+    .stats { display: flex; gap: 14px; margin-top: 20px; flex-wrap: wrap; }
+    .stat { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 14px 20px; flex: 1; min-width: 110px; }
+    .stat-label { font-size: 11px; color: #888; text-transform: uppercase; }
+    .stat-val { font-size: 24px; font-weight: bold; color: #6c47ff; margin-top: 4px; }
+    #log { margin-top: 20px; background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 14px; font-size: 13px; line-height: 2; min-height: 60px; max-height: 200px; overflow-y: auto; color: #444; }
+    table { display: none; margin-top: 20px; width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
+    th, td { padding: 10px 16px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
+    th { background: #f9f9f9; color: #555; }
+    .green { color: #16a34a; font-weight: bold; }
+    .amber { color: #d97706; font-weight: bold; }
+  </style>
+</head>
+<body>
+
+  <h1>Lab 1 — CNN Training (5 Epochs)</h1>
+  <p>Trains a CNN on MNIST and reports accuracy after 5 epochs.</p>
+
+  <button id="btn-train" onclick="startTraining()">▶ Start Training</button>
+  <div class="progress-wrap"><div id="progress-bar"></div></div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Epoch</div><div class="stat-val" id="stat-epoch">0/5</div></div>
+    <div class="stat"><div class="stat-label">Train Loss</div><div class="stat-val" id="stat-loss">—</div></div>
+    <div class="stat"><div class="stat-label">Train Acc</div><div class="stat-val" id="stat-acc">—</div></div>
+    <div class="stat"><div class="stat-label">Test Acc</div><div class="stat-val" id="stat-test">—</div></div>
+  </div>
+
+  <div id="log">Waiting to start…</div>
+
+  <table id="result-table">
+    <thead><tr><th>Epoch</th><th>Train Loss</th><th>Train Accuracy</th></tr></thead>
+    <tbody id="epoch-rows"></tbody>
+  </table>
+
+  <script>
+    // ── Step 1: Load MNIST data from Google's CDN ──────────────
+    class MnistData {
+      async load() {
+        // Load the image sprite (all 65000 digit images stacked vertically)
+        const img = new Image(), c = document.createElement('canvas'), cx = c.getContext('2d');
+        await new Promise((res, rej) => {
+          img.crossOrigin = '';
+          img.onload = () => {
+            const buf = new ArrayBuffer(65000 * 784 * 4);
+            c.width = img.width; c.height = 5000;
+            for (let i = 0; i < 13; i++) {
+              cx.drawImage(img, 0, i * 5000, img.width, 5000, 0, 0, img.width, 5000);
+              const px = cx.getImageData(0, 0, c.width, 5000).data;
+              const slice = new Float32Array(buf, i * 784 * 5000 * 4, 784 * 5000);
+              for (let j = 0; j < px.length / 4; j++) slice[j] = px[j * 4] / 255; // normalize 0-1
+            }
+            this.images = new Float32Array(buf); res();
+          };
+          img.onerror = rej;
+          img.src = 'https://storage.googleapis.com/learnjs-data/model-builder/mnist_images.png';
+        });
+        const raw = await (await fetch('https://storage.googleapis.com/learnjs-data/model-builder/mnist_labels_uint8')).arrayBuffer();
+        this.labels = new Uint8Array(raw);
+        // Shuffle train (55000) and test (10000) indices separately
+        this.trainIdx = tf.util.createShuffledIndices(55000); this.tc = 0;
+        this.testIdx  = tf.util.createShuffledIndices(10000); this.vc = 0;
+      }
+
+      // Get a random mini-batch of images + one-hot labels
+      batch(n, test = false) {
+        const imgs = new Float32Array(n * 784), lbls = new Uint8Array(n * 10);
+        const idx = test ? this.testIdx : this.trainIdx;
+        const offset = test ? 55000 : 0;
+        for (let i = 0; i < n; i++) {
+          const key = test ? 'vc' : 'tc';
+          this[key] = (this[key] + 1) % (test ? 10000 : 55000);
+          const id = idx[this[key]] + offset;
+          imgs.set(this.images.slice(id * 784, id * 784 + 784), i * 784);
+          lbls.set(this.labels.slice(id * 10, id * 10 + 10), i * 10);
+        }
+        return { xs: tf.tensor2d(imgs, [n, 784]), labels: tf.tensor2d(lbls, [n, 10]) };
+      }
+    }
+
+    // ── Step 2: Define CNN architecture ───────────────────────
+    function buildCNN() {
+      const model = tf.sequential();
+      // Conv layer 1: 32 filters, 3x3 kernel → learns edges/curves
+      model.add(tf.layers.conv2d({ inputShape: [28, 28, 1], filters: 32, kernelSize: 3, padding: 'same', activation: 'relu' }));
+      model.add(tf.layers.maxPooling2d({ poolSize: 2 })); // downsample 28x28 → 14x14
+      // Conv layer 2: 64 filters → learns more complex patterns
+      model.add(tf.layers.conv2d({ filters: 64, kernelSize: 3, padding: 'same', activation: 'relu' }));
+      model.add(tf.layers.maxPooling2d({ poolSize: 2 })); // 14x14 → 7x7
+      model.add(tf.layers.flatten());                     // flatten to 1D vector
+      model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
+      model.add(tf.layers.dense({ units: 10, activation: 'softmax' })); // 10 digit classes
+      model.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy', metrics: ['accuracy'] });
+      return model;
+    }
+
+    // ── Step 3: Train for 5 epochs and log results ─────────────
+    async function startTraining() {
+      document.getElementById('btn-train').disabled = true;
+      document.getElementById('log').innerHTML = '';
+      document.getElementById('epoch-rows').innerHTML = '';
+      document.getElementById('result-table').style.display = 'none';
+
+      const EPOCHS = 5, BATCH = 128, STEPS = 120; // 120 mini-batches per epoch
+
+      log('Loading MNIST dataset…');
+      const data = new MnistData();
+      await data.load();
+      log('Dataset loaded (55,000 train / 10,000 test).');
+
+      const model = buildCNN();
+      log(`CNN built — ${model.countParams().toLocaleString()} parameters.`);
+      log('Training started…');
+
+      const totalSteps = EPOCHS * STEPS;
+      let done = 0;
+
+      for (let ep = 0; ep < EPOCHS; ep++) {
+        let sumLoss = 0, sumAcc = 0;
+
+        for (let s = 0; s < STEPS; s++) {
+          const b = data.batch(BATCH);
+          const h = await model.fit(b.xs.reshape([BATCH, 28, 28, 1]), b.labels, { epochs: 1, verbose: 0 });
+          sumLoss += h.history.loss[0];
+          sumAcc  += h.history.acc[0];
+          b.xs.dispose(); b.labels.dispose();
+          // Update progress bar
+          document.getElementById('progress-bar').style.width = (++done / totalSteps * 100).toFixed(1) + '%';
+        }
+
+        const loss = (sumLoss / STEPS).toFixed(4);
+        const acc  = (sumAcc  / STEPS * 100).toFixed(2);
+
+        // Update live stats
+        document.getElementById('stat-epoch').textContent = `${ep + 1}/5`;
+        document.getElementById('stat-loss').textContent  = loss;
+        document.getElementById('stat-acc').textContent   = acc + '%';
+        log(`Epoch ${ep + 1}/5 — loss: ${loss}   acc: ${acc}%`);
+
+        // Add row to results table
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>Epoch ${ep + 1}</td><td class="amber">${loss}</td><td class="green">${acc}%</td>`;
+        document.getElementById('epoch-rows').appendChild(tr);
+      }
+
+      // Evaluate on test set (10 batches × 1000 = 10,000 images)
+      let totalAcc = 0;
+      for (let i = 0; i < 10; i++) {
+        const tb = data.batch(1000, true);
+        const r = model.evaluate(tb.xs.reshape([1000, 28, 28, 1]), tb.labels);
+        totalAcc += (await r[1].data())[0];
+        tb.xs.dispose(); tb.labels.dispose(); tf.dispose(r);
+      }
+      const testAcc = (totalAcc / 10 * 100).toFixed(2);
+      document.getElementById('stat-test').textContent = testAcc + '%';
+      log(`Training complete! Final test accuracy: ${testAcc}%`);
+      document.getElementById('result-table').style.display = 'table';
+      document.getElementById('btn-train').disabled = false;
+    }
+
+    function log(msg) {
+      const el = document.getElementById('log');
+      el.innerHTML += msg + '<br>';
+      el.scrollTop = el.scrollHeight;
+    }
+  </script>
+</body>
+</html>
