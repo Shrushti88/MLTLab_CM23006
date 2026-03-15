@@ -1,9 +1,187 @@
-<h1>Text Sentiment Analysis</h1>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Text Sentiment Analysis</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px; max-width: 680px; margin: auto; }
+    h1 { color: #333; margin-bottom: 6px; }
+    p  { color: #666; margin-bottom: 20px; }
+    #status { margin-bottom: 14px; font-size: 13px; color: #555; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; }
 
-<ul>
-<li><a href="LabAssignments/LabAssignment1/train.html">Train Model</a></li>
+    /* Input area */
+    .input-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .input-panel label { font-size: 13px; font-weight: bold; color: #444; display: block; margin-bottom: 8px; }
+    textarea { width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; font-family: Arial, sans-serif; resize: vertical; min-height: 90px; outline: none; }
+    textarea:focus { border-color: #6c47ff; }
+    .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+    .btn-analyze { flex: 1; padding: 11px; background: #6c47ff; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-clear { padding: 11px 20px; background: #fff; color: #e53e3e; border: 1px solid #e53e3e; border-radius: 8px; font-size: 14px; cursor: pointer; }
 
-<li><a href="LabAssignments/LabAssignment2/test.html">Test Sentiment</a></li>
+    /* Result panel */
+    .result-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; display: none; }
+    .result-label { font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+    .sentiment-display { display: flex; align-items: center; gap: 20px; padding: 16px; background: #f9f9f9; border-radius: 10px; margin-bottom: 14px; }
+    .sentiment-emoji { font-size: 52px; line-height: 1; }
+    .sentiment-word { font-size: 28px; font-weight: bold; }
+    .sentiment-word.positive { color: #16a34a; }
+    .sentiment-word.negative { color: #e53e3e; }
+    .conf-label { font-size: 12px; color: #888; margin-bottom: 4px; }
+    .conf-track { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; }
+    .conf-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    .conf-fill.positive { background: #16a34a; }
+    .conf-fill.negative { background: #e53e3e; }
+    #conf-pct { font-size: 18px; font-weight: bold; margin-top: 6px; }
 
-<li><a href="LabAssignments/LabAssignment3/compare.html">Model Comparison</a></li>
-</ul>
+    /* Example sentences */
+    .examples-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; }
+    .examples-panel h3 { font-size: 14px; color: #444; margin-bottom: 12px; }
+    .example-btn { display: inline-block; margin: 4px; padding: 6px 12px; background: #f0edff; color: #6c47ff; border: 1px solid #d0c8ff; border-radius: 20px; font-size: 12px; cursor: pointer; transition: background 0.2s; }
+    .example-btn:hover { background: #e0d8ff; }
+  </style>
+</head>
+<body>
+
+  <h1>Text Sentiment Analysis</h1>
+  <p>Type any sentence and classify it as positive or negative using a pre-trained model.</p>
+
+  <div id="status">Loading pre-trained sentiment model…</div>
+
+  <!-- Input -->
+  <div class="input-panel">
+    <label>Enter a sentence to analyze:</label>
+    <textarea id="text-input" placeholder="e.g. This movie was absolutely wonderful!"></textarea>
+    <div class="btn-row">
+      <button class="btn-analyze" id="btn-analyze" onclick="analyze()" disabled>▶ Analyze Sentiment</button>
+      <button class="btn-clear" onclick="clearAll()">✕ Clear</button>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-panel" id="result-panel">
+    <div class="result-label">Analysis Result</div>
+    <div class="sentiment-display">
+      <div class="sentiment-emoji" id="result-emoji">😊</div>
+      <div>
+        <div class="sentiment-word" id="result-word">Positive</div>
+        <div style="font-size:13px;color:#888;margin-top:4px" id="result-desc">The model is confident this text has a positive tone.</div>
+      </div>
+    </div>
+    <div class="conf-label">Confidence Score</div>
+    <div class="conf-track"><div class="conf-fill" id="conf-fill" style="width:0%"></div></div>
+    <div id="conf-pct"></div>
+  </div>
+
+  <!-- Examples -->
+  <div class="examples-panel">
+    <h3>Try an example sentence:</h3>
+    <span class="example-btn" onclick="useExample(this)">This movie was absolutely amazing!</span>
+    <span class="example-btn" onclick="useExample(this)">I really enjoyed the experience.</span>
+    <span class="example-btn" onclick="useExample(this)">What a wonderful day it has been.</span>
+    <span class="example-btn" onclick="useExample(this)">This was a terrible waste of time.</span>
+    <span class="example-btn" onclick="useExample(this)">I hated every minute of it.</span>
+    <span class="example-btn" onclick="useExample(this)">The service was absolutely dreadful.</span>
+    <span class="example-btn" onclick="useExample(this)">Not bad, but could be better.</span>
+    <span class="example-btn" onclick="useExample(this)">I have mixed feelings about this.</span>
+  </div>
+
+  <script>
+    // ── Load pre-trained TF.js Universal Sentence Encoder + sentiment ──
+    // We use a simple bag-of-words approach with a pre-built vocab
+    // since the TF.js sentiment model is the most stable option.
+
+    const VOCAB_URL  = 'https://storage.googleapis.com/tfjs-models/savedmodel/sentiment_cnn_v1/metadata.json';
+    const MODEL_URL  = 'https://storage.googleapis.com/tfjs-models/savedmodel/sentiment_cnn_v1/model.json';
+    const PAD_INDEX  = 0;
+    const OOV_INDEX  = 2;
+    const INDEX_FROM = 3;
+    const MAX_LEN    = 100;
+
+    let model = null, wordIndex = null;
+
+    // Load model and vocabulary on page load
+    async function loadModel() {
+      try {
+        setStatus('Loading vocabulary…');
+        const meta = await (await fetch(VOCAB_URL)).json();
+        wordIndex = meta['word_index'];
+
+        setStatus('Loading model weights…');
+        model = await tf.loadLayersModel(MODEL_URL);
+
+        setStatus('Model ready! Enter a sentence and click Analyze.');
+        document.getElementById('btn-analyze').disabled = false;
+      } catch (err) {
+        setStatus('Error loading model: ' + err.message);
+      }
+    }
+
+    // Convert a sentence to a padded sequence of word indices
+    function encodeText(text) {
+      const words = text.trim().toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/);
+      let seq = words.map(w => {
+        const idx = wordIndex[w];
+        return idx ? idx + INDEX_FROM : OOV_INDEX; // unknown word → OOV token
+      });
+      // Pad or truncate to MAX_LEN
+      if (seq.length > MAX_LEN) seq = seq.slice(seq.length - MAX_LEN);
+      while (seq.length < MAX_LEN) seq.unshift(PAD_INDEX); // left-pad with zeros
+      return seq;
+    }
+
+    // Run inference
+    function analyze() {
+      const text = document.getElementById('text-input').value.trim();
+      if (!text) { alert('Please enter some text first.'); return; }
+      if (!model) { setStatus('Model not loaded yet.'); return; }
+
+      const seq    = encodeText(text);
+      const input  = tf.tensor2d([seq], [1, MAX_LEN]);
+      const output = model.predict(input);
+
+      output.data().then(scores => {
+        input.dispose(); output.dispose();
+
+        // Score is 0–1: closer to 1 = positive, closer to 0 = negative
+        const score    = scores[0];
+        const positive = score >= 0.5;
+        const conf     = positive ? score : 1 - score;
+        const confPct  = (conf * 100).toFixed(1);
+
+        // Update result panel
+        document.getElementById('result-emoji').textContent = positive ? '😊' : '😞';
+        document.getElementById('result-word').textContent  = positive ? 'Positive' : 'Negative';
+        document.getElementById('result-word').className    = 'sentiment-word ' + (positive ? 'positive' : 'negative');
+        document.getElementById('result-desc').textContent  =
+          `The model sees a ${positive ? 'positive' : 'negative'} tone with ${confPct}% confidence. (Raw score: ${score.toFixed(3)})`;
+        document.getElementById('conf-fill').style.width    = confPct + '%';
+        document.getElementById('conf-fill').className      = 'conf-fill ' + (positive ? 'positive' : 'negative');
+        document.getElementById('conf-pct').textContent     = confPct + '% confident';
+        document.getElementById('result-panel').style.display = 'block';
+      });
+    }
+
+    function clearAll() {
+      document.getElementById('text-input').value = '';
+      document.getElementById('result-panel').style.display = 'none';
+    }
+
+    function useExample(el) {
+      document.getElementById('text-input').value = el.textContent;
+      document.getElementById('result-panel').style.display = 'none';
+    }
+
+    // Allow pressing Enter (Ctrl+Enter) to analyze
+    document.getElementById('text-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.ctrlKey) analyze();
+    });
+
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+    loadModel();
+  </script>
+</body>
+</html>

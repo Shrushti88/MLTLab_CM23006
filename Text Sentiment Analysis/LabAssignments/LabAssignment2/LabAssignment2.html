@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Lab 2 — Test Sentiment & Confidence Scores</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.16.0/dist/tf.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px; max-width: 720px; margin: auto; }
+    h1 { color: #333; margin-bottom: 6px; }
+    p  { color: #666; margin-bottom: 20px; }
+    #status { font-size: 13px; color: #555; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; }
+    button { padding: 12px 28px; background: #6c47ff; color: #fff; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .progress-wrap { margin: 10px 0 20px; background: #ddd; border-radius: 6px; height: 8px; }
+    #progress-bar { height: 8px; width: 0%; background: #6c47ff; border-radius: 6px; transition: width 0.2s; }
+
+    /* Input section */
+    .input-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .input-panel label { font-size: 13px; font-weight: bold; color: #444; display: block; margin-bottom: 8px; }
+    textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; font-family: Arial; resize: none; height: 80px; outline: none; }
+    textarea:focus { border-color: #6c47ff; }
+    .btn-row { display: flex; gap: 10px; margin-top: 10px; }
+    .btn-analyze { flex: 1; padding: 11px; background: #6c47ff; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    .btn-analyze:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-clear { padding: 11px 18px; background: #fff; color: #e53e3e; border: 1px solid #e53e3e; border-radius: 8px; font-size: 14px; cursor: pointer; }
+
+    /* Result */
+    .result-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; display: none; }
+    .res-header { display: flex; align-items: center; gap: 16px; padding: 14px; background: #f9f9f9; border-radius: 10px; margin-bottom: 14px; }
+    .res-emoji { font-size: 46px; line-height: 1; }
+    .res-word { font-size: 26px; font-weight: bold; }
+    .res-word.positive { color: #16a34a; }
+    .res-word.negative { color: #e53e3e; }
+    .res-sub { font-size: 13px; color: #888; margin-top: 4px; }
+
+    /* Confidence meter */
+    .conf-section-title { font-size: 11px; font-weight: bold; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .conf-bar-wrap { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+    .conf-label { font-size: 12px; color: #666; width: 70px; flex-shrink: 0; }
+    .conf-track { flex: 1; height: 14px; background: #eee; border-radius: 7px; overflow: hidden; }
+    .conf-fill { height: 100%; border-radius: 7px; transition: width 0.4s; }
+    .conf-fill.positive { background: #16a34a; }
+    .conf-fill.negative { background: #e53e3e; }
+    .conf-pct { font-size: 13px; font-weight: bold; width: 44px; text-align: right; }
+
+    /* Score explanation */
+    .score-explain { background: #f0edff; border: 1px solid #d0c8ff; border-radius: 8px; padding: 12px 14px; font-size: 13px; color: #444; line-height: 1.7; }
+    .score-explain strong { color: #6c47ff; }
+
+    /* History */
+    .history-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; }
+    .history-panel h3 { font-size: 14px; color: #444; margin-bottom: 12px; }
+    .history-empty { font-size: 13px; color: #aaa; }
+    .history-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid #f0f0f0; font-size: 13px; }
+    .history-item:last-child { border-bottom: none; }
+    .hist-tag { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; flex-shrink: 0; }
+    .hist-tag.positive { background: #dcfce7; color: #16a34a; }
+    .hist-tag.negative { background: #fee2e2; color: #e53e3e; }
+    .hist-conf { font-size: 11px; color: #888; flex-shrink: 0; }
+    .hist-text { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+    /* Example chips */
+    .example-chip { display: inline-block; margin: 4px; padding: 5px 11px; background: #f0edff; color: #6c47ff; border: 1px solid #d0c8ff; border-radius: 20px; font-size: 12px; cursor: pointer; }
+    .example-chip:hover { background: #e0d8ff; }
+  </style>
+</head>
+<body>
+
+  <h1>Lab 2 — Test & Interpret Confidence Scores</h1>
+  <p>Train the model, then test it on your own sentences. Understand what the confidence score means.</p>
+
+  <div id="status">Click "Train Model" to begin.</div>
+
+  <button id="btn-train" onclick="trainModel()">▶ Train Model</button>
+  <div class="progress-wrap"><div id="progress-bar"></div></div>
+
+  <!-- Input -->
+  <div class="input-panel">
+    <label>Enter a sentence to classify:</label>
+    <textarea id="text-input" placeholder="e.g. I really enjoyed the experience."></textarea>
+    <div class="btn-row">
+      <button class="btn-analyze" id="btn-analyze" onclick="analyze()" disabled>▶ Classify Sentence</button>
+      <button class="btn-clear" onclick="clearResult()">✕ Clear</button>
+    </div>
+    <div style="margin-top:10px">
+      <span style="font-size:12px;color:#888;">Try an example: </span>
+      <span class="example-chip" onclick="useEx(this)">This was fantastic!</span>
+      <span class="example-chip" onclick="useEx(this)">I hated everything about it.</span>
+      <span class="example-chip" onclick="useEx(this)">It was okay I guess.</span>
+      <span class="example-chip" onclick="useEx(this)">Absolutely wonderful experience.</span>
+      <span class="example-chip" onclick="useEx(this)">Terrible and disappointing.</span>
+    </div>
+  </div>
+
+  <!-- Result -->
+  <div class="result-panel" id="result-panel">
+
+    <div class="res-header">
+      <div class="res-emoji" id="res-emoji">😊</div>
+      <div>
+        <div class="res-word" id="res-word">Positive</div>
+        <div class="res-sub" id="res-sub">High confidence prediction</div>
+      </div>
+    </div>
+
+    <div class="conf-section-title">Confidence Breakdown</div>
+
+    <div class="conf-bar-wrap">
+      <div class="conf-label">😊 Positive</div>
+      <div class="conf-track"><div class="conf-fill positive" id="bar-pos" style="width:0%"></div></div>
+      <div class="conf-pct" id="pct-pos" style="color:#16a34a">0%</div>
+    </div>
+    <div class="conf-bar-wrap">
+      <div class="conf-label">😞 Negative</div>
+      <div class="conf-track"><div class="conf-fill negative" id="bar-neg" style="width:0%"></div></div>
+      <div class="conf-pct" id="pct-neg" style="color:#e53e3e">0%</div>
+    </div>
+
+    <br>
+    <div class="score-explain" id="score-explain"></div>
+
+  </div>
+
+  <!-- History -->
+  <div class="history-panel">
+    <h3>Classification History</h3>
+    <div id="history-list"><div class="history-empty">No classifications yet.</div></div>
+  </div>
+
+  <script>
+    // ── Same dataset and model as Lab 1 ───────────────────────
+    const DATASET = [
+      ["I absolutely loved this movie", 1], ["The food was delicious and amazing", 1],
+      ["What a wonderful experience this was", 1], ["I am so happy with the results", 1],
+      ["This product exceeded my expectations", 1], ["The service was excellent and friendly", 1],
+      ["I feel great about my decision", 1], ["Truly an outstanding performance", 1],
+      ["This is the best day of my life", 1], ["I highly recommend this to everyone", 1],
+      ["The weather is beautiful today", 1], ["She gave a brilliant presentation", 1],
+      ["I enjoyed every moment of the trip", 1], ["The team did a fantastic job", 1],
+      ["Everything went perfectly as planned", 1], ["I love spending time with my family", 1],
+      ["This book is incredibly well written", 1], ["The staff were helpful and kind", 1],
+      ["I am thrilled with the outcome", 1], ["Such a positive and uplifting experience", 1],
+      ["The concert was absolutely breathtaking", 1], ["I felt so welcomed and comfortable", 1],
+      ["The product quality is superb", 1], ["I gained so much from this course", 1],
+      ["Amazing graphics and smooth gameplay", 1], ["The hotel room was clean and cozy", 1],
+      ["I never thought it could be this good", 1], ["A truly memorable and joyful occasion", 1],
+      ["The app works flawlessly on my phone", 1], ["I am very satisfied with the purchase", 1],
+      ["This was a complete waste of time", 0], ["I absolutely hated the ending", 0],
+      ["The service was rude and slow", 0], ["I am very disappointed with this product", 0],
+      ["Terrible experience from start to finish", 0], ["The food tasted awful and was cold", 0],
+      ["I would never buy this again", 0], ["This is the worst movie I have ever seen", 0],
+      ["I felt completely ignored by the staff", 0], ["The quality is really poor and cheap", 0],
+      ["I regret spending money on this", 0], ["The app crashes constantly on my device", 0],
+      ["The hotel was dirty and overpriced", 0], ["I was extremely frustrated the whole time", 0],
+      ["Nothing worked as advertised", 0], ["The instructions were confusing and useless", 0],
+      ["I had a horrible time at the event", 0], ["The noise was unbearable all night", 0],
+      ["Customer support was completely unhelpful", 0], ["I do not recommend this at all", 0],
+      ["The packaging was damaged on arrival", 0], ["I waited two hours with no response", 0],
+      ["The performance was boring and flat", 0], ["Nothing about this impressed me", 0],
+      ["The battery drains extremely fast", 0], ["I am so frustrated with this software", 0],
+      ["This purchase was a total mistake", 0], ["The plot was predictable and dull", 0],
+      ["I felt cheated after buying this", 0], ["The worst customer experience imaginable", 0],
+    ];
+
+    const MAX_LEN = 12;
+    let model = null, vocab = null;
+
+    function buildVocab(data) {
+      const freq = {};
+      data.forEach(([s]) => s.toLowerCase().split(' ').forEach(w => freq[w] = (freq[w] || 0) + 1));
+      const words = Object.keys(freq).sort((a, b) => freq[b] - freq[a]);
+      const v = { '<PAD>': 0, '<UNK>': 1 };
+      words.forEach((w, i) => v[w] = i + 2);
+      return v;
+    }
+
+    function encode(sentence, vocab, maxLen = MAX_LEN) {
+      const tokens = sentence.toLowerCase().split(' ').map(w => vocab[w] || 1);
+      while (tokens.length < maxLen) tokens.unshift(0);
+      return tokens.slice(-maxLen);
+    }
+
+    // ── Train ──────────────────────────────────────────────────
+    async function trainModel() {
+      document.getElementById('btn-train').disabled = true;
+      setStatus('Building vocabulary and model…');
+
+      vocab = buildVocab(DATASET);
+      const vocabSize = Object.keys(vocab).length;
+
+      const xs = DATASET.map(([s]) => encode(s, vocab));
+      const ys = DATASET.map(([, l]) => l);
+      const xT = tf.tensor2d(xs, [DATASET.length, MAX_LEN]);
+      const yT = tf.tensor1d(ys);
+
+      // Build embedding + dense model
+      model = tf.sequential();
+      model.add(tf.layers.embedding({ inputDim: vocabSize, outputDim: 16, inputLength: MAX_LEN }));
+      model.add(tf.layers.flatten());
+      model.add(tf.layers.dense({ units: 32, activation: 'relu' }));
+      model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+      model.compile({ optimizer: 'adam', loss: 'binaryCrossentropy', metrics: ['accuracy'] });
+
+      const EPOCHS = 20;
+      await model.fit(xT, yT, {
+        epochs: EPOCHS, shuffle: true,
+        callbacks: {
+          onEpochEnd: (epoch, logs) => {
+            document.getElementById('progress-bar').style.width = ((epoch + 1) / EPOCHS * 100) + '%';
+            setStatus(`Training epoch ${epoch + 1}/${EPOCHS} — acc: ${(logs.acc * 100).toFixed(1)}%`);
+          }
+        }
+      });
+
+      xT.dispose(); yT.dispose();
+      setStatus('Model ready! Enter a sentence to classify.');
+      document.getElementById('btn-analyze').disabled = false;
+      document.getElementById('btn-train').disabled = false;
+    }
+
+    // ── Analyze ────────────────────────────────────────────────
+    function analyze() {
+      const text = document.getElementById('text-input').value.trim();
+      if (!text || !model) return;
+
+      const seq   = encode(text, vocab);
+      const input = tf.tensor2d([seq], [1, MAX_LEN]);
+      const pred  = model.predict(input);
+
+      pred.data().then(scores => {
+        input.dispose(); pred.dispose();
+
+        const score    = scores[0];         // raw 0–1 output
+        const posConf  = score;             // probability of positive
+        const negConf  = 1 - score;         // probability of negative
+        const positive = score >= 0.5;
+        const winConf  = (Math.max(posConf, negConf) * 100).toFixed(1);
+
+        // Update result display
+        document.getElementById('res-emoji').textContent = positive ? '😊' : '😞';
+        document.getElementById('res-word').textContent  = positive ? 'Positive' : 'Negative';
+        document.getElementById('res-word').className    = 'res-word ' + (positive ? 'positive' : 'negative');
+        document.getElementById('res-sub').textContent   = `${winConf}% confidence · Raw score: ${score.toFixed(3)}`;
+
+        document.getElementById('bar-pos').style.width = (posConf * 100).toFixed(1) + '%';
+        document.getElementById('bar-neg').style.width = (negConf * 100).toFixed(1) + '%';
+        document.getElementById('pct-pos').textContent = (posConf * 100).toFixed(1) + '%';
+        document.getElementById('pct-neg').textContent = (negConf * 100).toFixed(1) + '%';
+
+        // Explain the score
+        let explanation = `The model outputs a raw score of <strong>${score.toFixed(3)}</strong>. `;
+        if (score > 0.85) explanation += 'A score this high means the model is very sure this text is positive. Strong positive words were likely detected.';
+        else if (score > 0.6) explanation += 'A score above 0.5 leans positive, but the model has some uncertainty. The text may contain neutral or mixed language.';
+        else if (score > 0.4) explanation += 'The score is near 0.5, meaning the model is unsure. The sentence may be ambiguous or contain words not seen during training.';
+        else if (score > 0.15) explanation += 'A score below 0.5 leans negative, but with moderate certainty. Some negative cues were found.';
+        else explanation += 'A score near 0 means the model is very confident this is negative. Strong negative words were likely detected.';
+        document.getElementById('score-explain').innerHTML = explanation;
+        document.getElementById('result-panel').style.display = 'block';
+
+        // Add to history
+        addHistory(text, positive, winConf);
+      });
+    }
+
+    function addHistory(text, positive, conf) {
+      const list = document.getElementById('history-list');
+      // Remove empty placeholder
+      const empty = list.querySelector('.history-empty');
+      if (empty) empty.remove();
+
+      const item = document.createElement('div');
+      item.className = 'history-item';
+      item.innerHTML = `
+        <span class="hist-tag ${positive ? 'positive' : 'negative'}">${positive ? 'POS' : 'NEG'}</span>
+        <span class="hist-text">${text}</span>
+        <span class="hist-conf">${conf}%</span>`;
+      list.prepend(item); // newest first
+    }
+
+    function clearResult() {
+      document.getElementById('text-input').value = '';
+      document.getElementById('result-panel').style.display = 'none';
+    }
+
+    function useEx(el) {
+      document.getElementById('text-input').value = el.textContent;
+      document.getElementById('result-panel').style.display = 'none';
+    }
+
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
+  </script>
+</body>
+</html>
