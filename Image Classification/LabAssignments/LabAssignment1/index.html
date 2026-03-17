@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Lab 1 — MobileNet: Classify a Static Image</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px; max-width: 680px; margin: auto; }
+    h1 { color: #333; margin-bottom: 6px; }
+    p  { color: #666; margin-bottom: 20px; }
+    #status { font-size: 13px; color: #555; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+    .info-box { background: #f0edff; border: 1px solid #d0c8ff; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; font-size: 13px; color: #333; line-height: 1.7; }
+    .info-box strong { color: #6c47ff; }
+    .panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .panel h3 { font-size: 14px; color: #444; margin: 0 0 12px; }
+    .upload-label { display: block; padding: 22px; border: 2px dashed #ccc; border-radius: 10px; text-align: center; font-size: 15px; color: #555; cursor: pointer; font-weight: bold; }
+    .upload-label:hover { border-color: #6c47ff; color: #6c47ff; background: #faf9ff; }
+    input[type="file"] { display: none; }
+    .preview-wrap { margin-top: 14px; text-align: center; display: none; }
+    #preview-img { max-width: 100%; max-height: 260px; border-radius: 10px; border: 1px solid #ddd; }
+    button { width: 100%; margin-top: 12px; padding: 12px; background: #6c47ff; color: #fff; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; display: none; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .result-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; display: none; }
+    .result-panel h3 { font-size: 14px; color: #444; margin: 0 0 14px; }
+    .pred-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .rank { width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 13px; font-weight: bold; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .rank-1{background:#f0a500;}.rank-2{background:#888;}.rank-3{background:#b45309;}
+    .pred-info { flex: 1; }
+    .pred-name  { font-size: 14px; color: #333; margin-bottom: 4px; text-transform: capitalize; }
+    .pred-track { height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
+    .pred-fill  { height: 100%; background: #6c47ff; border-radius: 5px; }
+    .pred-pct   { font-size: 14px; font-weight: bold; color: #6c47ff; width: 52px; text-align: right; flex-shrink: 0; }
+
+    /* Score interpretation */
+    .interp { margin-top: 14px; padding: 12px 16px; border-radius: 8px; font-size: 13px; line-height: 1.7; }
+    .interp.high   { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
+    .interp.medium { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .interp.low    { background: #fff5f5; border: 1px solid #fecaca; color: #b91c1c; }
+  </style>
+</head>
+<body>
+
+  <h1>Lab 1 — Load MobileNet & Classify a Static Image</h1>
+  <p>Upload a single image. MobileNet classifies it and returns the top-3 predictions with confidence scores.</p>
+
+  <div id="status">Loading MobileNet model… please wait.</div>
+
+  <div class="info-box">
+    <strong>How MobileNet classifies your image:</strong><br>
+    1. Your image is resized to <strong>224×224 pixels</strong> internally.<br>
+    2. Pixel values are normalised to [−1, 1].<br>
+    3. A forward pass runs through 53 convolutional layers.<br>
+    4. A softmax output gives a probability for each of <strong>1,000 ImageNet classes</strong>.<br>
+    The top-3 highest probabilities are displayed as predictions.
+  </div>
+
+  <div class="panel">
+    <h3>Upload an image to classify</h3>
+    <label class="upload-label" for="file-input">📷 Click to choose an image from your device</label>
+    <input type="file" id="file-input" accept="image/*" onchange="handleUpload(this)"/>
+    <div class="preview-wrap" id="preview-wrap">
+      <img id="preview-img" src="" alt="preview"/>
+    </div>
+    <button id="btn-classify" onclick="classifyImage()" disabled>▶ Classify Image</button>
+  </div>
+
+  <div class="result-panel" id="result-panel">
+    <h3>Top-3 Predictions</h3>
+    <div id="pred-list"></div>
+    <div class="interp" id="interp"></div>
+  </div>
+
+  <script>
+    let net = null, imageReady = false;
+
+    async function loadModel() {
+      try {
+        net = await mobilenet.load({ version: 2, alpha: 1.0 });
+        setStatus('MobileNet loaded! Upload an image to begin.');
+        if (imageReady) document.getElementById('btn-classify').disabled = false;
+      } catch (err) {
+        setStatus('Error: ' + err.message);
+      }
+    }
+
+    function handleUpload(input) {
+      if (!input.files[0]) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = document.getElementById('preview-img');
+        img.onload = () => {
+          imageReady = true;
+          document.getElementById('preview-wrap').style.display = 'block';
+          const btn = document.getElementById('btn-classify');
+          btn.style.display = 'block';
+          btn.disabled = !net;
+          document.getElementById('result-panel').style.display = 'none';
+          setStatus(net ? 'Image ready. Click "Classify Image".' : 'Image loaded. Model still loading…');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+
+    async function classifyImage() {
+      if (!net || !imageReady) return;
+      setStatus('Running MobileNet…');
+      document.getElementById('btn-classify').disabled = true;
+      try {
+        const preds = await net.classify(document.getElementById('preview-img'), 3);
+        showResults(preds);
+        setStatus('Done!');
+      } catch (err) {
+        setStatus('Error: ' + err.message);
+      }
+      document.getElementById('btn-classify').disabled = false;
+    }
+
+    function showResults(preds) {
+      const list = document.getElementById('pred-list');
+      list.innerHTML = '';
+      preds.forEach((p, i) => {
+        const pct   = (p.probability * 100).toFixed(1);
+        const label = p.className.split(',')[0];
+        list.innerHTML += `
+          <div class="pred-row">
+            <div class="rank rank-${i+1}">${i+1}</div>
+            <div class="pred-info">
+              <div class="pred-name">${label}</div>
+              <div class="pred-track"><div class="pred-fill" style="width:${pct}%"></div></div>
+            </div>
+            <div class="pred-pct">${pct}%</div>
+          </div>`;
+      });
+
+      // Confidence interpretation
+      const topConf = preds[0].probability;
+      const interp  = document.getElementById('interp');
+      if (topConf >= 0.7) {
+        interp.className = 'interp high';
+        interp.innerHTML = `<strong>High confidence (${(topConf*100).toFixed(1)}%)</strong> — The model is very sure. The image clearly resembles this class in its training data.`;
+      } else if (topConf >= 0.35) {
+        interp.className = 'interp medium';
+        interp.innerHTML = `<strong>Moderate confidence (${(topConf*100).toFixed(1)}%)</strong> — The model has a reasonable guess but the image may be partially occluded, at an unusual angle, or between classes.`;
+      } else {
+        interp.className = 'interp low';
+        interp.innerHTML = `<strong>Low confidence (${(topConf*100).toFixed(1)}%)</strong> — The model is unsure. The image may not resemble any of MobileNet's 1,000 training classes closely.`;
+      }
+
+      document.getElementById('result-panel').style.display = 'block';
+    }
+
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
+    loadModel();
+  </script>
+</body>
+</html>

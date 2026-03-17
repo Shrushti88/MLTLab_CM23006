@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Lab 2 — MobileNet: Accuracy on Multiple Images</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; padding: 30px; max-width: 800px; margin: auto; }
+    h1 { color: #333; margin-bottom: 6px; }
+    p  { color: #666; margin-bottom: 20px; }
+    #status { font-size: 13px; color: #555; background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; }
+    button { padding: 11px 26px; background: #6c47ff; color: #fff; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; margin-bottom: 20px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .stats { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+    .stat { background: #fff; border: 1px solid #ddd; border-radius: 10px; padding: 14px 20px; flex: 1; min-width: 100px; text-align: center; }
+    .stat-label { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 4px; }
+    .stat-val   { font-size: 28px; font-weight: bold; color: #6c47ff; }
+    .stat-val.green { color: #16a34a; }
+    .stat-val.red   { color: #e53e3e; }
+
+    /* Add image panel */
+    .add-panel { background: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    .add-panel h3 { font-size: 14px; color: #444; margin: 0 0 12px; }
+    .add-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .upload-label { padding: 10px 18px; border: 2px dashed #ccc; border-radius: 8px; font-size: 13px; color: #555; cursor: pointer; font-weight: bold; white-space: nowrap; }
+    .upload-label:hover { border-color: #6c47ff; color: #6c47ff; }
+    input[type="file"] { display: none; }
+    input[type="text"] { flex: 1; min-width: 140px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 8px; font-size: 13px; outline: none; }
+    input[type="text"]:focus { border-color: #6c47ff; }
+    .btn-add { padding: 10px 20px; background: #16a34a; color: #fff; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; white-space: nowrap; margin-bottom: 0; }
+    .add-preview { margin-top: 10px; display: none; font-size: 13px; color: #555; display: flex; align-items: center; gap: 10px; }
+    .add-preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+
+    /* Grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-bottom: 20px; }
+    .img-card { background: #fff; border: 1px solid #ddd; border-radius: 10px; overflow: hidden; }
+    .img-card img { width: 100%; height: 130px; object-fit: cover; display: block; }
+    .card-body  { padding: 10px 12px; }
+    .card-true  { font-size: 11px; color: #888; margin-bottom: 3px; }
+    .card-pred  { font-size: 13px; font-weight: bold; color: #333; }
+    .card-conf  { font-size: 12px; color: #6c47ff; }
+    .badge { display: inline-block; margin-top: 5px; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; }
+    .badge-pending { background: #f0edff; color: #6c47ff; }
+    .badge-correct { background: #dcfce7; color: #16a34a; }
+    .badge-wrong   { background: #fee2e2; color: #e53e3e; }
+
+    /* Summary */
+    .summary { background: #fff; border: 1px solid #ddd; border-radius: 12px; overflow: hidden; display: none; }
+    .summary h3 { padding: 14px 20px; border-bottom: 1px solid #eee; font-size: 14px; color: #444; margin: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 16px; border-bottom: 1px solid #eee; text-align: left; }
+    th { background: #f9f9f9; color: #666; font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
+    .row-correct td { background: #f0fdf4; }
+    .row-wrong   td { background: #fff5f5; }
+  </style>
+</head>
+<body>
+
+  <h1>Lab 2 — Test Classification Accuracy on Multiple Images</h1>
+  <p>Upload at least 5 images with known labels. MobileNet classifies all of them and measures its accuracy.</p>
+
+  <div id="status">Loading MobileNet… please wait.</div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Images</div><div class="stat-val" id="s-total">0</div></div>
+    <div class="stat"><div class="stat-label">Correct</div><div class="stat-val green" id="s-correct">0</div></div>
+    <div class="stat"><div class="stat-label">Wrong</div><div class="stat-val red" id="s-wrong">0</div></div>
+    <div class="stat"><div class="stat-label">Accuracy</div><div class="stat-val" id="s-acc">—</div></div>
+  </div>
+
+  <!-- Add image + label -->
+  <div class="add-panel">
+    <h3>Add images to test (minimum 5 recommended)</h3>
+    <div class="add-row">
+      <label class="upload-label" for="add-file">📷 Choose Image</label>
+      <input type="file" id="add-file" accept="image/*" onchange="previewPending(this)"/>
+      <input type="text" id="true-label" placeholder="True label (e.g. cat, chair, dog)"/>
+      <button class="btn-add" onclick="addImage()">+ Add</button>
+    </div>
+    <div class="add-preview" id="add-preview" style="display:none">
+      <img id="add-thumb" src="" alt=""/>
+      <span id="add-filename" style="font-size:12px;color:#888;"></span>
+    </div>
+  </div>
+
+  <div class="grid" id="img-grid">
+    <div style="grid-column:1/-1;text-align:center;padding:24px;color:#bbb;font-size:13px;">
+      No images added yet. Use the panel above.
+    </div>
+  </div>
+
+  <button id="btn-run" onclick="runAll()" disabled>▶ Classify All Images</button>
+
+  <div class="summary" id="summary">
+    <h3>Classification Summary</h3>
+    <table>
+      <thead><tr><th>#</th><th>True Label</th><th>MobileNet Top-1</th><th>Confidence</th><th>Result</th></tr></thead>
+      <tbody id="summary-body"></tbody>
+    </table>
+  </div>
+
+  <script>
+    let net = null;
+    const queue = []; // {dataURL, label}
+    let pendingDataURL = null, pendingFilename = null;
+
+    async function loadModel() {
+      try {
+        net = await mobilenet.load({ version: 2, alpha: 1.0 });
+        setStatus('MobileNet ready! Add images above, then click "Classify All".');
+        updateRunBtn();
+      } catch (err) {
+        setStatus('Error: ' + err.message);
+      }
+    }
+
+    function previewPending(input) {
+      if (!input.files[0]) return;
+      pendingFilename = input.files[0].name;
+      const reader = new FileReader();
+      reader.onload = e => {
+        pendingDataURL = e.target.result;
+        document.getElementById('add-thumb').src = pendingDataURL;
+        document.getElementById('add-filename').textContent = pendingFilename;
+        document.getElementById('add-preview').style.display = 'flex';
+      };
+      reader.readAsDataURL(input.files[0]);
+    }
+
+    function addImage() {
+      const label = document.getElementById('true-label').value.trim().toLowerCase();
+      if (!pendingDataURL) { alert('Please choose an image first.'); return; }
+      if (!label)          { alert('Please enter the true label for this image.'); return; }
+      queue.push({ dataURL: pendingDataURL, label });
+      pendingDataURL = null;
+      document.getElementById('add-file').value = '';
+      document.getElementById('true-label').value = '';
+      document.getElementById('add-preview').style.display = 'none';
+      renderGrid();
+      updateRunBtn();
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('img-grid');
+      if (!queue.length) {
+        grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:24px;color:#bbb;font-size:13px;">No images added yet.</div>';
+        document.getElementById('s-total').textContent = '0';
+        return;
+      }
+      grid.innerHTML = '';
+      document.getElementById('s-total').textContent = queue.length;
+      queue.forEach((item, i) => {
+        grid.innerHTML += `
+          <div class="img-card" id="card-${i}">
+            <img src="${item.dataURL}" alt="${item.label}"/>
+            <div class="card-body">
+              <div class="card-true">True: <strong>${item.label}</strong></div>
+              <div class="card-pred" id="pred-${i}">—</div>
+              <div class="card-conf" id="conf-${i}"></div>
+              <span class="badge badge-pending" id="badge-${i}">Pending</span>
+            </div>
+          </div>`;
+      });
+    }
+
+    async function runAll() {
+      if (!net || !queue.length) return;
+      document.getElementById('btn-run').disabled = true;
+      document.getElementById('summary').style.display = 'none';
+      document.getElementById('summary-body').innerHTML = '';
+      document.getElementById('s-correct').textContent = '0';
+      document.getElementById('s-wrong').textContent   = '0';
+      document.getElementById('s-acc').textContent     = '—';
+
+      let correct = 0;
+
+      for (let i = 0; i < queue.length; i++) {
+        setStatus(`Classifying image ${i + 1} of ${queue.length}…`);
+
+        const imgEl = new Image();
+        await new Promise(res => { imgEl.onload = res; imgEl.src = queue[i].dataURL; });
+
+        let topLabel = 'error', topConf = 0, isCorrect = false;
+        try {
+          const preds  = await net.classify(imgEl, 3);
+          topLabel     = preds[0].className.toLowerCase();
+          topConf      = (preds[0].probability * 100).toFixed(1);
+          // Check: does the true label appear anywhere in the predicted class name?
+          isCorrect    = topLabel.includes(queue[i].label);
+          if (isCorrect) correct++;
+        } catch(e) { topLabel = 'failed'; }
+
+        const done = i + 1;
+        document.getElementById(`pred-${i}`).textContent  = topLabel.split(',')[0];
+        document.getElementById(`conf-${i}`).textContent  = topConf ? topConf + '%' : '';
+        const badge = document.getElementById(`badge-${i}`);
+        badge.textContent = isCorrect ? '✔ Correct' : '✗ Wrong';
+        badge.className   = 'badge ' + (isCorrect ? 'badge-correct' : 'badge-wrong');
+
+        document.getElementById('s-correct').textContent = correct;
+        document.getElementById('s-wrong').textContent   = done - correct;
+        document.getElementById('s-acc').textContent     = (correct / done * 100).toFixed(0) + '%';
+
+        const tr = document.createElement('tr');
+        tr.className = isCorrect ? 'row-correct' : 'row-wrong';
+        tr.innerHTML = `<td>${done}</td><td>${queue[i].label}</td><td>${topLabel.split(',')[0]}</td><td>${topConf}%</td><td>${isCorrect?'✔ Correct':'✗ Wrong'}</td>`;
+        document.getElementById('summary-body').appendChild(tr);
+      }
+
+      document.getElementById('summary').style.display = 'block';
+      setStatus(`Done! ${correct} / ${queue.length} correct (${(correct/queue.length*100).toFixed(0)}% accuracy).`);
+      document.getElementById('btn-run').disabled = false;
+    }
+
+    function updateRunBtn() {
+      document.getElementById('btn-run').disabled = !(net && queue.length >= 1);
+    }
+
+    function setStatus(msg) { document.getElementById('status').textContent = msg; }
+    loadModel();
+  </script>
+</body>
+</html>
