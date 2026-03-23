@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pose Detection — PoseNet</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- TensorFlow.js core -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <!-- PoseNet model -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet@2.2.2/dist/posenet.min.js"></script>
+
+    <!-- Font pairing: same as last practical -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <!-- ── Header ── -->
+    <header class="header">
+        <div class="header-left">
+            <div class="badge">TensorFlow.js · PoseNet · Skeleton Tracking</div>
+            <h1>Pose Detection<br><span class="accent">with PoseNet</span></h1>
+        </div>
+        <div class="header-right student-card">
+            <div class="student-row">
+                <span class="label">Name</span>
+                <span class="value">Shrushti Zod</span>
+            </div>
+            <div class="divider-h"></div>
+            <div class="student-row">
+                <span class="label">USN</span>
+                <span class="value">CM23006</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ── Mode Toggle ── -->
+    <div class="mode-bar card">
+        <span class="mode-label">Detection Mode</span>
+        <div class="toggle-group">
+            <button id="btn-single" class="toggle-btn active" onclick="setMode('single')">Single Pose</button>
+            <button id="btn-multi"  class="toggle-btn"        onclick="setMode('multi')">Multi Pose</button>
+        </div>
+        <div class="mode-info">
+            <span class="dot live"></span>
+            <span id="mode-status">Single-pose · higher accuracy</span>
+        </div>
+    </div>
+
+    <!-- ── Main Grid ── -->
+    <main class="grid">
+
+        <!-- Left: webcam feed -->
+        <section class="card video-card">
+            <div class="card-label">
+                <span class="dot live"></span> LIVE FEED
+            </div>
+            <div class="video-wrapper">
+                <video id="webcam" autoplay playsinline muted></video>
+                <canvas id="overlay"></canvas>
+
+                <div class="fps-counter">
+                    <span class="fps-icon">◈</span>
+                    <span id="fps-value">FPS: 0</span>
+                </div>
+
+                <div id="loading-overlay" class="loading-overlay">
+                    <div class="spinner-ring"></div>
+                    <p class="loading-title">Loading PoseNet</p>
+                    <p class="loading-sub">TensorFlow.js · MobileNet backbone</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Right: stats panel -->
+        <aside class="right-panel">
+
+            <!-- Squat counter -->
+            <section class="card counter-card">
+                <div class="card-label">SQUAT COUNTER</div>
+                <div class="counter-body">
+                    <div class="rep-display">
+                        <span id="rep-count">0</span>
+                        <span class="rep-unit">reps</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Phase</span>
+                        <span id="phase-badge" class="phase-badge phase-up">UP</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Knee Angle</span>
+                        <span id="knee-angle" class="angle-value">—°</span>
+                    </div>
+                    <button class="reset-btn" onclick="resetCounter()">↺ Reset</button>
+                </div>
+            </section>
+
+            <!-- Keypoint confidence -->
+            <section class="card keypoints-card">
+                <div class="card-label">KEYPOINT SCORES</div>
+                <div id="keypoint-list" class="keypoint-list">
+                    <div class="empty-state">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <circle cx="12" cy="12" r="9"/>
+                            <path d="M12 8v4M12 16h.01"/>
+                        </svg>
+                        <p>Waiting for pose…</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lab objectives -->
+            <section class="card info-card">
+                <div class="card-label">LAB OBJECTIVES</div>
+                <ul class="objectives">
+                    <li>
+                        <span class="obj-num">01</span>
+                        <span>Detect human pose keypoints from webcam feed and visualise skeleton</span>
+                    </li>
+                    <li>
+                        <span class="obj-num">02</span>
+                        <span>Count squat repetitions using keypoint joint angles</span>
+                    </li>
+                    <li>
+                        <span class="obj-num">03</span>
+                        <span>Analyse accuracy differences between single-pose &amp; multi-pose detection</span>
+                    </li>
+                </ul>
+            </section>
+
+        </aside>
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
