@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webcam Object Detection — MobileNet</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- TensorFlow.js core -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- MobileNet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    <!-- COCO-SSD (bounding boxes via MobileNet backbone) -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+
+    <!-- Distinctive font pairing -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div class="page-wrapper">
+
+        <!-- ── Header ── -->
+        <header class="header">
+            <div class="header-left">
+                <div class="badge">TensorFlow.js · COCO-SSD · MobileNet</div>
+                <h1>Webcam-based<br><span class="accent">Object Detection</span></h1>
+            </div>
+            <div class="header-right student-card">
+                <div class="student-row">
+                    <span class="label">Name</span>
+                    <span class="value">Shrushti Zod</span>
+                </div>
+                <div class="divider-h"></div>
+                <div class="student-row">
+                    <span class="label">USN</span>
+                    <span class="value">CM23006</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- ── Main Grid ── -->
+        <main class="grid">
+
+            <!-- Left: video feed -->
+            <section class="card video-card">
+                <div class="card-label">
+                    <span class="dot live"></span> LIVE FEED
+                </div>
+
+                <div class="video-wrapper">
+                    <video id="webcam" autoplay playsinline muted></video>
+                    <canvas id="overlay"></canvas>
+
+                    <div id="fps-counter" class="fps-counter">
+                        <span class="fps-icon">◈</span>
+                        <span id="fps-value">FPS: 0</span>
+                    </div>
+
+                    <!-- Loading overlay -->
+                    <div id="loading-overlay" class="loading-overlay">
+                        <div class="spinner-ring"></div>
+                        <p class="loading-title">Loading Model</p>
+                        <p class="loading-sub">MobileNet · COCO-SSD</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: results -->
+            <aside class="right-panel">
+
+                <!-- Top predictions -->
+                <section class="card predictions-card">
+                    <div class="card-label">TOP DETECTIONS</div>
+                    <div id="predictions" class="predictions-list">
+                        <div class="empty-state">
+                            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
+                            <p>Waiting for webcam…</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Lab assignment info -->
+                <section class="card info-card">
+                    <div class="card-label">LAB OBJECTIVES</div>
+                    <ul class="objectives">
+                        <li>
+                            <span class="obj-num">01</span>
+                            <span>Capture webcam frames &amp; classify objects using MobileNet</span>
+                        </li>
+                        <li>
+                            <span class="obj-num">02</span>
+                            <span>Overlay bounding-box labels on the video feed</span>
+                        </li>
+                        <li>
+                            <span class="obj-num">03</span>
+                            <span>Measure FPS &amp; analyse real-time inference performance</span>
+                        </li>
+                    </ul>
+                </section>
+
+            </aside>
+        </main>
+
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
