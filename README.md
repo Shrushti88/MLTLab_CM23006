@@ -30,8 +30,8 @@ git clone https://github.com/Shrushti88/MLTLab_CM23006.git
 | 3   | Digit Recognition (MNIST Dataset)     | Train a CNN on MNIST digits and evaluate predictions. | [Lab 3](https://github.com/Shrushti88/MLTLab_CM23006/tree/main/Digit%20Recognition%20(MNIST%20Dataset))   |
 | 4   | Text Sentiment Analysis                 | Classify text as positive or negative using an RNN or pre-trained sentiment     | [Lab 4](https://github.com/Shrushti88/MLTLab_CM23006/tree/main/Text%20Sentiment%20Analysis)   |
 | 5   | Image classification with Pre-trained Model (MobileNet)         | Load MobileNet and classify images directly in the browser.               | [Lab 5](https://github.com/Shrushti88/MLTLab_CM23006/tree/main/Image%20Classification)   |
-| 6   | Webcam-based Object Detection               | Connect webcam, capture frames, and classify objects in real time.               | [Coming Soon](./Lab6)   |
-| 7   | Pose Detection with PoseNet           | Detect human body poses, visualise skeletons, and count exercise repetitions.     | [Coming Soon](./Lab7)   |
+| 6   | Webcam-based Object Detection               | Connect webcam, capture frames, and classify objects in real time.               | [Coming Soon](https://github.com/Shrushti88/MLTLab_CM23006/tree/main/Webcam%20based%20object%20detection)   |
+| 7   | Pose Detection with PoseNet           | Detect human body poses, visualise skeletons, and count exercise repetitions.     | [Coming Soon](https://github.com/Shrushti88/MLTLab_CM23006/tree/main/Pose%20Detection%20with%20Posenet)   |
 | 8   | Deploying a Model in Browser         | Save a trained model locally, reload it, and run predictions.             | [Coming Soon](./Lab8)   |
 | 9   | Transfer Learning with Images             | Retrain MobileNet for custom categories (e.g., fruits).                 | [Coming Soon](./Lab9)   |
 | 10  | Real-time Gesture Control          | Control video playback and volume using hand gestures.                | [Coming Soon](./Lab10) |
