@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Crochet Stitch Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+  <style>
+    /* ── Design: warm craft aesthetic — cream, terracotta, sage ── */
+    :root {
+      --cream:   #f5f0e8;
+      --parchment: #ede4d2;
+      --terra:   #c4693a;
+      --terra-dim: rgba(196,105,58,0.15);
+      --sage:    #6b8c6b;
+      --ink:     #2c2416;
+      --ink-mid: #6b5d4a;
+      --ink-dim: #a8997e;
+      --stitch-chain: #c4693a;
+      --stitch-sc:    #6b8c6b;
+      --stitch-dc:    #4a7fa5;
+      --stitch-inc:   #9b6ba8;
+      --stitch-dec:   #c4864a;
+      --stitch-sl:    #8c6b4a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--cream);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── Texture overlay ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.4' fill='%232c2416' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+
+    /* ── Header ── */
+    header {
+      position: relative; z-index: 10;
+      padding: 32px 40px 24px;
+      border-bottom: 1px solid var(--parchment);
+      display: flex; align-items: baseline; gap: 20px; flex-wrap: wrap;
+    }
+
+    .header-title {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      color: var(--ink);
+      letter-spacing: -0.5px;
+    }
+
+    .header-title em { color: var(--terra); font-style: italic; }
+
+    .header-sub {
+      font-size: 0.7rem;
+      color: var(--ink-dim);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .ml-tags {
+      margin-left: auto;
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+
+    .ml-tag {
+      font-size: 0.58rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 3px;
+      border: 1px solid;
+    }
+
+    .ml-tag.t { color: var(--terra); border-color: rgba(196,105,58,0.4); background: var(--terra-dim); }
+    .ml-tag.s { color: var(--sage);  border-color: rgba(107,140,107,0.4); background: rgba(107,140,107,0.1); }
+    .ml-tag.b { color: #4a7fa5; border-color: rgba(74,127,165,0.4); background: rgba(74,127,165,0.1); }
+
+    /* ── Main layout ── */
+    .main {
+      position: relative; z-index: 10;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 32px 40px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 28px;
+    }
+
+    @media (max-width: 860px) {
+      .main { grid-template-columns: 1fr; padding: 20px; }
+      header { padding: 24px 20px 18px; }
+    }
+
+    /* ── Left column ── */
+    .left-col { display: flex; flex-direction: column; gap: 20px; }
+
+    /* ── Panels ── */
+    .panel {
+      background: #fff;
+      border: 1px solid var(--parchment);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(44,36,22,0.05);
+    }
+
+    .panel-label {
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .panel-label::before {
+      content: '';
+      width: 3px; height: 10px;
+      border-radius: 2px;
+      background: var(--terra);
+    }
+
+    /* ── Input ── */
+    textarea#pattern-input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--parchment);
+      border-radius: 8px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--ink);
+      background: var(--cream);
+      resize: vertical;
+      min-height: 80px;
+      outline: none;
+      transition: border-color 0.2s;
+      line-height: 1.6;
+    }
+
+    textarea#pattern-input:focus { border-color: var(--terra); }
+
+    .hint {
+      margin-top: 8px;
+      font-size: 0.68rem;
+      color: var(--ink-dim);
+      line-height: 1.6;
+    }
+
+    .hint code {
+      background: var(--terra-dim);
+      color: var(--terra);
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    .btn-generate {
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      background: var(--terra);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-family: 'DM Mono', monospace;
+      font-weight: 500;
+      font-size: 0.85rem;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-transform: uppercase;
+    }
+
+    .btn-generate:hover { background: #b35a2e; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(196,105,58,0.3); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    /* ── Model status ── */
+    .model-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.68rem; color: var(--ink-dim);
+    }
+
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-dim); flex-shrink: 0; }
+    .status-dot.ready { background: var(--sage); box-shadow: 0 0 5px var(--sage); }
+    .status-dot.loading { background: var(--terra); animation: pulse 0.8s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ── JSON panel ── */
+    .json-output {
+      font-size: 0.72rem;
+      line-height: 1.8;
+      color: var(--ink-mid);
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .json-output .key   { color: var(--terra); }
+    .json-output .val   { color: var(--sage); }
+    .json-output .num   { color: #4a7fa5; }
+
+    /* ── Tensor panel ── */
+    .tensor-grid {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+
+    .tensor-cell {
+      font-size: 0.65rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--parchment);
+      background: var(--cream);
+      color: var(--ink-mid);
+    }
+
+    .tensor-cell.chain { border-color: var(--stitch-chain); color: var(--stitch-chain); background: rgba(196,105,58,0.08); }
+    .tensor-cell.sc    { border-color: var(--stitch-sc);    color: var(--stitch-sc);    background: rgba(107,140,107,0.08); }
+    .tensor-cell.dc    { border-color: var(--stitch-dc);    color: var(--stitch-dc);    background: rgba(74,127,165,0.08); }
+    .tensor-cell.inc   { border-color: var(--stitch-inc);   color: var(--stitch-inc);   background: rgba(155,107,168,0.08); }
+    .tensor-cell.dec   { border-color: var(--stitch-dec);   color: var(--stitch-dec);   background: rgba(196,134,74,0.08); }
+    .tensor-cell.sl    { border-color: var(--stitch-sl);    color: var(--stitch-sl);    background: rgba(140,107,74,0.08); }
+
+    /* ── Model actions ── */
+    .btn-row { display: flex; gap: 8px; }
+    .btn-sm {
+      flex: 1;
+      padding: 8px;
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      transition: all 0.15s;
+    }
+    .btn-sm.save { background: var(--terra-dim); color: var(--terra); border: 1px solid rgba(196,105,58,0.3); }
+    .btn-sm.load { background: rgba(107,140,107,0.12); color: var(--sage); border: 1px solid rgba(107,140,107,0.3); }
+    .btn-sm:hover { filter: brightness(1.1); }
+
+    #model-msg { font-size: 0.65rem; color: var(--ink-dim); margin-top: 6px; min-height: 16px; }
+
+    /* ── Right column: Canvas ── */
+    .right-col { display: flex; flex-direction: column; gap: 16px; }
+
+    .canvas-panel {
+      background: #fff;
+      border: 1px solid var(--parchment);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(44,36,22,0.05);
+    }
+
+    .canvas-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--parchment);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .canvas-title {
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .canvas-title::before {
+      content: '';
+      width: 3px; height: 10px;
+      border-radius: 2px;
+      background: var(--sage);
+    }
+
+    /* Stitch legend */
+    .legend {
+      display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    }
+
+    .legend-item {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 0.62rem; color: var(--ink-mid);
+    }
+
+    .legend-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #stitch-canvas {
+      display: block;
+      width: 100%;
+      background: var(--cream);
+    }
+
+    /* ── Model report ── */
+    .report-panel {
+      background: #fff;
+      border: 1px solid var(--parchment);
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 2px 8px rgba(44,36,22,0.05);
+    }
+
+    .report-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .report-cell {
+      background: var(--cream);
+      border: 1px solid var(--parchment);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .report-cell-label { font-size: 0.6rem; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .report-cell-val   { font-size: 1rem; font-weight: 500; color: var(--ink); }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-thumb { background: var(--parchment); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div>
+      <h1 class="header-title">Crochet <em>Stitch</em> Visualizer</h1>
+      <div class="header-sub">Pattern Parser · TF.js · Visual Diagram</div>
+    </div>
+    <div class="ml-tags">
+      <span class="ml-tag t">Tensors</span>
+      <span class="ml-tag t">Linear Reg</span>
+      <span class="ml-tag s">NLP Parser</span>
+      <span class="ml-tag s">Dense Model</span>
+      <span class="ml-tag b">Save/Load</span>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- ── LEFT COLUMN ── -->
+    <div class="left-col">
+
+      <!-- Input panel -->
+      <div class="panel">
+        <div class="panel-label">Pattern Input</div>
+        <textarea id="pattern-input" placeholder="e.g. ch 5, 5 sc, inc, 3 dc, sl st">ch 6, 6 sc, 2 inc, 3 dc, dec, sl st</textarea>
+        <div class="hint">
+          Supported: <code>ch</code> <code>sc</code> <code>dc</code> <code>inc</code> <code>dec</code> <code>sl st</code> <code>hdc</code> <code>tr</code>
+        </div>
+        <button class="btn-generate" id="btn-gen" onclick="generate()">▶ Generate Visual</button>
+        <div class="model-status" style="margin-top:10px;">
+          <div class="status-dot loading" id="status-dot"></div>
+          <span id="status-text">Loading TF.js model…</span>
+        </div>
+      </div>
+
+      <!-- Parsed JSON panel — Practical 3: NLP/Text Processing -->
+      <div class="panel">
+        <div class="panel-label">Parsed JSON — NLP Module</div>
+        <div class="json-output" id="json-output">Run pattern to see parsed stitch data.</div>
+      </div>
+
+      <!-- Tensor panel — Practical 1: TF.js Basics -->
+      <div class="panel">
+        <div class="panel-label">Tensor Representation — TF.js Basics</div>
+        <div class="tensor-grid" id="tensor-grid">
+          <div style="font-size:0.7rem;color:var(--ink-dim);">Stitch tensors appear here.</div>
+        </div>
+        <div style="margin-top:8px;font-size:0.62rem;color:var(--ink-dim);line-height:1.6;" id="tensor-info"></div>
+      </div>
+
+      <!-- Model / deployment panel — Practical 7: Model Deployment -->
+      <div class="panel">
+        <div class="panel-label">Model — Dense Layers + Save/Load</div>
+        <div class="btn-row">
+          <button class="btn-sm save" onclick="saveModel()">💾 Save Model</button>
+          <button class="btn-sm load" onclick="loadModel()">📂 Load Model</button>
+        </div>
+        <div id="model-msg">Model initialising…</div>
+        <div class="report-grid" id="report-grid"></div>
+      </div>
+
+    </div>
+
+    <!-- ── RIGHT COLUMN ── -->
+    <div class="right-col">
+
+      <!-- Canvas panel -->
+      <div class="canvas-panel">
+        <div class="canvas-header">
+          <div class="canvas-title">Stitch Diagram — Visual Engine</div>
+          <div class="legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stitch-chain)"></div> chain</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stitch-sc)"></div> sc</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stitch-dc)"></div> dc / hdc / tr</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stitch-inc)"></div> inc</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stitch-dec)"></div> dec</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--stitch-sl)"></div> sl st</div>
+          </div>
+        </div>
+        <canvas id="stitch-canvas" height="420"></canvas>
+      </div>
+
+      <!-- Model report -->
+      <div class="report-panel">
+        <div class="panel-label">Linear Regression — Position Prediction</div>
+        <div style="font-size:0.7rem;color:var(--ink-dim);line-height:1.7;margin-bottom:6px;">
+          A <code style="background:var(--terra-dim);color:var(--terra);padding:1px 5px;border-radius:3px;">tf.sequential()</code>
+          model with dense layers predicts stitch X/Y layout positions from encoded stitch type + count tensors.
+          Trained on generated sample data each session.
+        </div>
+        <div class="report-grid" id="train-report"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+  "use strict";
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MODULE 1 — NLP PARSER
+  //  Practical 3: Text Sentiment Analysis → adapted to pattern parsing
+  //  Rule-based tokeniser that converts pattern text → structured JSON
+  // ═══════════════════════════════════════════════════════════════════
+
+  // Stitch encoding: maps abbreviation → {type, code, height}
+  const STITCH_MAP = {
+    'ch':    { type: 'chain',          code: 0, height: 1.0 },
+    'sl st': { type: 'slip_stitch',    code: 1, height: 0.5 },
+    'sl':    { type: 'slip_stitch',    code: 1, height: 0.5 },
+    'sc':    { type: 'single_crochet', code: 2, height: 1.5 },
+    'hdc':   { type: 'half_dc',        code: 3, height: 2.0 },
+    'dc':    { type: 'double_crochet', code: 4, height: 2.5 },
+    'tr':    { type: 'treble',         code: 5, height: 3.0 },
+    'inc':   { type: 'increase',       code: 6, height: 1.5 },
+    'dec':   { type: 'decrease',       code: 7, height: 1.5 },
+  };
+
+  /**
+   * parsePattern — NLP module
+   * Tokenises comma-separated pattern text into structured stitch objects.
+   * Maps to: Practical 3 (Text Processing / NLP)
+   *
+   * Input:  "ch 5, 5 sc, inc, 3 dc"
+   * Output: [{type:'chain', count:5, code:0, height:1.0}, ...]
+   */
+  function parsePattern(text) {
+    // Step 1: split on commas and clean whitespace
+    const tokens = text.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+    const stitches = [];
+
+    for (const token of tokens) {
+      // Step 2: match patterns like "ch 5", "5 sc", "inc", "sl st"
+      // Try "sl st" first (two-word abbreviation)
+      let matched = false;
+
+      // Pattern A: "sl st" (special two-word stitch)
+      if (/sl\s*st/.test(token)) {
+        const countMatch = token.match(/^(\d+)\s+sl/);
+        const count = countMatch ? parseInt(countMatch[1]) : 1;
+        stitches.push({ ...STITCH_MAP['sl st'], count, raw: token });
+        matched = true;
+      }
+
+      if (!matched) {
+        // Pattern B: "ch 5" → abbreviation first, then number
+        const abFirst = token.match(/^([a-z]+)\s+(\d+)$/);
+        if (abFirst) {
+          const [, ab, n] = abFirst;
+          if (STITCH_MAP[ab]) {
+            stitches.push({ ...STITCH_MAP[ab], count: parseInt(n), raw: token });
+            matched = true;
+          }
+        }
+      }
+
+      if (!matched) {
+        // Pattern C: "5 sc" → number first, then abbreviation
+        const numFirst = token.match(/^(\d+)\s+([a-z]+)$/);
+        if (numFirst) {
+          const [, n, ab] = numFirst;
+          if (STITCH_MAP[ab]) {
+            stitches.push({ ...STITCH_MAP[ab], count: parseInt(n), raw: token });
+            matched = true;
+          }
+        }
+      }
+
+      if (!matched) {
+        // Pattern D: bare stitch with no count (e.g. "inc", "dec")
+        const bare = token.match(/^([a-z]+)$/);
+        if (bare && STITCH_MAP[bare[1]]) {
+          stitches.push({ ...STITCH_MAP[bare[1]], count: 1, raw: token });
+        }
+      }
+    }
+
+    return stitches;
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MODULE 2 — TENSORFLOW.JS TENSOR OPS
+  //  Practical 1 (Pre-lab): Tensor creation and operations
+  //  Convert parsed stitches → tensors, perform normalisation
+  // ═══════════════════════════════════════════════════════════════════
+
+  /**
+   * buildTensors — converts parsed stitch array into TF.js tensors
+   * Maps to: Practical 1 (TensorFlow.js Basics — tensor creation + ops)
+   */
+  function buildTensors(stitches) {
+    if (!stitches.length) return null;
+
+    // Encode stitches: each stitch → [code, count, height]
+    const raw = stitches.map(s => [s.code, s.count, s.height]);
+
+    // Tensor creation — tf.tensor2d: shape [N, 3]
+    const inputTensor = tf.tensor2d(raw, [raw.length, 3]);
+
+    // Tensor operations: normalise each column to [0, 1]
+    const min = inputTensor.min(0);        // min per column
+    const max = inputTensor.max(0);        // max per column
+    const range = max.sub(min).add(1e-6);  // avoid division by zero
+    const normalised = inputTensor.sub(min).div(range);
+
+    // Cumulative sum of counts → used for x-position estimation
+    const counts = tf.tensor1d(stitches.map(s => s.count));
+    const cumsum = counts.cumsum();
+
+    // Compute statistics (tensor ops)
+    const totalStitches = counts.sum();
+    const meanCount     = counts.mean();
+
+    return { inputTensor, normalised, cumsum, totalStitches, meanCount, min, max };
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MODULE 3 — LINEAR REGRESSION MODEL
+  //  Practical 2: tf.sequential() with dense layers
+  //  Predicts layout X-position from stitch code + count inputs
+  // ═══════════════════════════════════════════════════════════════════
+
+  let layoutModel = null;
+
+  /**
+   * buildLayoutModel — creates a tf.sequential() regression model
+   * Maps to: Practical 2 (Linear Regression with tf.sequential + dense)
+   *
+   * Input:  [stitch_code_normalised, count_normalised] → 2 features
+   * Output: predicted x-offset (continuous value)
+   */
+  function buildLayoutModel() {
+    const model = tf.sequential();
+
+    // Dense layer 1: feature extraction
+    model.add(tf.layers.dense({
+      inputShape: [2],
+      units: 16,
+      activation: 'relu',
+      name: 'hidden_1'
+    }));
+
+    // Dense layer 2: refinement
+    model.add(tf.layers.dense({
+      units: 8,
+      activation: 'relu',
+      name: 'hidden_2'
+    }));
+
+    // Output layer: single continuous value (x-position offset)
+    model.add(tf.layers.dense({
+      units: 1,
+      activation: 'linear',
+      name: 'output'
+    }));
+
+    model.compile({
+      optimizer: tf.train.adam(0.01),
+      loss: 'meanSquaredError',
+      metrics: ['mae']
+    });
+
+    return model;
+  }
+
+  /**
+   * trainLayoutModel — generates synthetic training data and trains model
+   * Maps to: Practical 2 (Linear Regression training loop)
+   */
+  async function trainLayoutModel(model) {
+    // Synthetic training: stitch_code/count → expected x spacing
+    // Rule: higher stitch height → wider spacing; more count → larger step
+    const N = 80;
+    const trainX = [], trainY = [];
+
+    for (let i = 0; i < N; i++) {
+      const code  = Math.floor(Math.random() * 8) / 7;   // normalised 0-1
+      const count = Math.random();                          // normalised 0-1
+      const xStep = (0.3 + code * 0.5 + count * 0.3);    // target spacing rule
+      trainX.push([code, count]);
+      trainY.push([xStep]);
+    }
+
+    const xT = tf.tensor2d(trainX, [N, 2]);
+    const yT = tf.tensor2d(trainY, [N, 1]);
+
+    const history = await model.fit(xT, yT, {
+      epochs: 40,
+      batchSize: 16,
+      shuffle: true,
+      verbose: 0
+    });
+
+    xT.dispose(); yT.dispose();
+    return history;
+  }
+
+  /**
+   * predictPositions — uses trained model to predict stitch x-positions
+   * Maps to: Practical 2 (model.predict)
+   */
+  async function predictPositions(stitches) {
+    if (!layoutModel || !stitches.length) return [];
+
+    const inputs = stitches.map(s => [s.code / 7, Math.min(s.count / 20, 1)]);
+    const inputT = tf.tensor2d(inputs, [inputs.length, 2]);
+    const predT  = layoutModel.predict(inputT);
+    const preds  = await predT.data();
+    inputT.dispose(); predT.dispose();
+
+    return Array.from(preds);
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MODULE 4 — MODEL DEPLOYMENT: Save / Load
+  //  Practical 7: model.save('localstorage://...'), tf.loadLayersModel
+  // ═══════════════════════════════════════════════════════════════════
+
+  const MODEL_KEY = 'localstorage://crochet-layout-model';
+
+  async function saveModel() {
+    if (!layoutModel) { setMsg('No model to save yet.'); return; }
+    try {
+      await layoutModel.save(MODEL_KEY);
+      setMsg('Model saved to localStorage ✔');
+    } catch (e) { setMsg('Save failed: ' + e.message); }
+  }
+
+  async function loadModel() {
+    try {
+      setMsg('Loading model from localStorage…');
+      layoutModel = await tf.loadLayersModel(MODEL_KEY);
+      layoutModel.compile({ optimizer: tf.train.adam(0.01), loss: 'meanSquaredError', metrics: ['mae'] });
+      setMsg('Model loaded from localStorage ✔');
+      renderModelReport(null);
+    } catch (e) {
+      setMsg('No saved model found. Training fresh model…');
+      await initModel();
+    }
+  }
+
+  function setMsg(msg) { document.getElementById('model-msg').textContent = msg; }
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MODULE 5 — VISUALIZATION ENGINE
+  //  Canvas-based stitch diagram renderer
+  // ═══════════════════════════════════════════════════════════════════
+
+  const STITCH_COLORS = {
+    chain:          '#c4693a',
+    slip_stitch:    '#8c6b4a',
+    single_crochet: '#6b8c6b',
+    half_dc:        '#5a94b8',
+    double_crochet: '#4a7fa5',
+    treble:         '#3a6a90',
+    increase:       '#9b6ba8',
+    decrease:       '#c4864a',
+  };
+
+  const STITCH_HEIGHTS = {
+    chain: 10, slip_stitch: 6, single_crochet: 18,
+    half_dc: 24, double_crochet: 32, treble: 42,
+    increase: 18, decrease: 18,
+  };
+
+  /**
+   * drawDiagram — renders stitch diagram on canvas
+   * Maps to: Practical 5 (Visualization Engine)
+   */
+  async function drawDiagram(stitches, predictions) {
+    const canvas = document.getElementById('stitch-canvas');
+    const dpr    = window.devicePixelRatio || 1;
+    const W      = canvas.parentElement.clientWidth;
+    const H      = 420;
+
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Background
+    ctx.fillStyle = '#f5f0e8';
+    ctx.fillRect(0, 0, W, H);
+
+    // Subtle grid dots
+    ctx.fillStyle = 'rgba(44,36,22,0.05)';
+    for (let gx = 20; gx < W; gx += 24) {
+      for (let gy = 20; gy < H; gy += 24) {
+        ctx.beginPath(); ctx.arc(gx, gy, 1, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    if (!stitches.length) {
+      ctx.fillStyle = '#a8997e';
+      ctx.font = '14px DM Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Enter a pattern and click Generate Visual', W / 2, H / 2);
+      return;
+    }
+
+    // Expand stitches: repeat each stitch `count` times
+    const expanded = [];
+    stitches.forEach((s, si) => {
+      const predSpacing = predictions[si] || 0.5;
+      for (let i = 0; i < s.count; i++) {
+        expanded.push({ ...s, predSpacing, groupIdx: si });
+      }
+    });
+
+    // Layout: arrange in rows, wrapping at canvas width
+    const MARGIN_X = 40, MARGIN_Y = 60;
+    const BASE_Y   = H - MARGIN_Y;
+    const colW     = Math.max(28, Math.min(52, (W - MARGIN_X * 2) / Math.min(expanded.length, 14)));
+    const rowH     = 90;
+    const colsPerRow = Math.floor((W - MARGIN_X * 2) / colW);
+
+    // Draw row baseline
+    const numRows = Math.ceil(expanded.length / colsPerRow);
+    for (let r = 0; r < numRows; r++) {
+      const y = BASE_Y - r * rowH;
+      ctx.strokeStyle = 'rgba(196,105,58,0.2)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(MARGIN_X, y);
+      ctx.lineTo(W - MARGIN_X, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw each stitch symbol
+    expanded.forEach((s, i) => {
+      const row = Math.floor(i / colsPerRow);
+      const col = i % colsPerRow;
+      const x   = MARGIN_X + col * colW + colW / 2;
+      const y   = BASE_Y - row * rowH;
+      const color = STITCH_COLORS[s.type] || '#8c6b4a';
+      const h   = STITCH_HEIGHTS[s.type] || 18;
+
+      ctx.strokeStyle = color;
+      ctx.fillStyle   = color;
+      ctx.lineWidth   = 2.2;
+
+      switch (s.type) {
+        case 'chain':
+          // Chain → hollow circle
+          ctx.beginPath();
+          ctx.arc(x, y - 6, 6, 0, Math.PI * 2);
+          ctx.stroke();
+          // Connecting line
+          if (col < colsPerRow - 1 && i < expanded.length - 1) {
+            ctx.beginPath(); ctx.moveTo(x + 6, y - 6); ctx.lineTo(x + colW - 6, y - 6); ctx.stroke();
+          }
+          break;
+
+        case 'slip_stitch':
+          // Slip stitch → small filled circle
+          ctx.beginPath();
+          ctx.arc(x, y - 4, 4, 0, Math.PI * 2);
+          ctx.fill();
+          break;
+
+        case 'single_crochet':
+          // SC → vertical bar with cross
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x - 5, y - h / 2); ctx.lineTo(x + 5, y - h / 2); ctx.stroke();
+          // Base dot
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+          break;
+
+        case 'half_dc':
+          // HDC → medium bar, one cross bar
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x - 5, y - h * 0.4); ctx.lineTo(x + 5, y - h * 0.4); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+          break;
+
+        case 'double_crochet':
+          // DC → tall bar, two cross bars
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x - 5, y - h * 0.35); ctx.lineTo(x + 5, y - h * 0.35); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(x - 5, y - h * 0.6); ctx.lineTo(x + 5, y - h * 0.6); ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+          break;
+
+        case 'treble':
+          // TR → tallest bar, three cross bars
+          ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - h); ctx.stroke();
+          [0.3, 0.52, 0.72].forEach(f => {
+            ctx.beginPath(); ctx.moveTo(x - 5, y - h * f); ctx.lineTo(x + 5, y - h * f); ctx.stroke();
+          });
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+          ctx.lineWidth = 2.2;
+          break;
+
+        case 'increase':
+          // Inc → two branches splitting from base (V shape)
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - 8, y - h);
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + 8, y - h);
+          ctx.stroke();
+          // Cross bars on both
+          ctx.beginPath();
+          ctx.moveTo(x - 12, y - h * 0.55); ctx.lineTo(x - 4, y - h * 0.55);
+          ctx.moveTo(x + 4,  y - h * 0.55); ctx.lineTo(x + 12, y - h * 0.55);
+          ctx.stroke();
+          ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+          break;
+
+        case 'decrease':
+          // Dec → two lines merging at top
+          ctx.beginPath();
+          ctx.moveTo(x - 7, y);
+          ctx.lineTo(x, y - h);
+          ctx.moveTo(x + 7, y);
+          ctx.lineTo(x, y - h);
+          ctx.stroke();
+          ctx.beginPath(); ctx.arc(x - 7, y, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x + 7, y, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(x, y - h, 3, 0, Math.PI * 2); ctx.fill();
+          break;
+      }
+
+      // Stitch label below
+      ctx.fillStyle   = color;
+      ctx.font        = '9px DM Mono, monospace';
+      ctx.textAlign   = 'center';
+      ctx.fillText(s.type === 'chain' ? 'ch' :
+                   s.type === 'slip_stitch' ? 'sl' :
+                   s.type === 'single_crochet' ? 'sc' :
+                   s.type === 'half_dc' ? 'hdc' :
+                   s.type === 'double_crochet' ? 'dc' :
+                   s.type === 'treble' ? 'tr' :
+                   s.type === 'increase' ? 'inc' : 'dec', x, y + 12);
+    });
+
+    // Row number labels
+    for (let r = 0; r < numRows; r++) {
+      const y = BASE_Y - r * rowH;
+      ctx.fillStyle = 'rgba(44,36,22,0.35)';
+      ctx.font = '10px DM Mono, monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText('R' + (r + 1), 8, y + 4);
+    }
+
+    // Total stitch count label
+    ctx.fillStyle = 'rgba(44,36,22,0.4)';
+    ctx.font = '11px DM Mono, monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(expanded.length + ' total stitches', W - 12, 18);
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MODULE 6 — RENDER JSON + TENSOR UI
+  // ═══════════════════════════════════════════════════════════════════
+
+  function renderJSON(stitches) {
+    const out = document.getElementById('json-output');
+    if (!stitches.length) { out.textContent = 'No stitches parsed.'; return; }
+
+    // Syntax-highlighted JSON rendering
+    const lines = stitches.map((s, i) => {
+      return `<span style="color:var(--ink-dim)">[${i}]</span> {` +
+        ` <span class="key">"type"</span>: <span class="val">"${s.type}"</span>,` +
+        ` <span class="key">"count"</span>: <span class="num">${s.count}</span>,` +
+        ` <span class="key">"code"</span>: <span class="num">${s.code}</span>,` +
+        ` <span class="key">"height"</span>: <span class="num">${s.height}</span>` +
+        ` }`;
+    });
+    out.innerHTML = lines.join('\n');
+  }
+
+  function renderTensors(stitches, tensors) {
+    const grid = document.getElementById('tensor-grid');
+    const info = document.getElementById('tensor-info');
+
+    if (!stitches.length || !tensors) {
+      grid.innerHTML = '<div style="font-size:0.7rem;color:var(--ink-dim);">No tensor data.</div>';
+      info.textContent = '';
+      return;
+    }
+
+    // Show each stitch as a tensor cell
+    grid.innerHTML = '';
+    stitches.forEach(s => {
+      const cls = s.type.replace('_', '').replace('single', 'sc').replace('crochet', '').replace('double', 'dc').replace('half', 'hdc');
+      const key = s.type === 'chain' ? 'chain' :
+                  s.type === 'slip_stitch' ? 'sl' :
+                  s.type === 'single_crochet' ? 'sc' :
+                  s.type === 'double_crochet' ? 'dc' :
+                  s.type === 'increase' ? 'inc' :
+                  s.type === 'decrease' ? 'dec' : 'sc';
+      for (let i = 0; i < s.count; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'tensor-cell ' + key;
+        cell.textContent = key + '[' + s.code + ',' + s.height + ']';
+        grid.appendChild(cell);
+      }
+    });
+
+    // Async tensor stats
+    tensors.totalStitches.data().then(total => {
+      tensors.meanCount.data().then(mean => {
+        info.innerHTML =
+          `Shape: <strong>[${stitches.length}, 3]</strong> &nbsp;|&nbsp; ` +
+          `Total stitches: <strong>${total[0].toFixed(0)}</strong> &nbsp;|&nbsp; ` +
+          `Mean count: <strong>${mean[0].toFixed(2)}</strong> &nbsp;|&nbsp; ` +
+          `Ops: sub, div, cumsum, sum, mean`;
+      });
+    });
+  }
+
+  function renderModelReport(history) {
+    const grid = document.getElementById('train-report');
+    const cells = [
+      { label: 'Architecture',  val: 'sequential' },
+      { label: 'Layers',        val: '3 dense' },
+      { label: 'Input shape',   val: '[N, 2]' },
+      { label: 'Output',        val: 'x-offset' },
+      { label: 'Optimizer',     val: 'adam(0.01)' },
+      { label: 'Loss',          val: history ? history.history.loss.slice(-1)[0].toFixed(4) : '—' },
+    ];
+    grid.innerHTML = cells.map(c =>
+      `<div class="report-cell">
+        <div class="report-cell-label">${c.label}</div>
+        <div class="report-cell-val">${c.val}</div>
+       </div>`
+    ).join('');
+  }
+
+
+  // ═══════════════════════════════════════════════════════════════════
+  //  MAIN ORCHESTRATION
+  // ═══════════════════════════════════════════════════════════════════
+
+  async function initModel() {
+    document.getElementById('status-dot').className = 'status-dot loading';
+    document.getElementById('status-text').textContent = 'Building & training model…';
+    setMsg('Training layout model…');
+
+    layoutModel = buildLayoutModel();
+    const history = await trainLayoutModel(layoutModel);
+
+    document.getElementById('status-dot').className = 'status-dot ready';
+    document.getElementById('status-text').textContent = 'Model ready — enter pattern and generate';
+    setMsg('Model trained (' + history.history.loss.length + ' epochs). Save to localStorage below.');
+    renderModelReport(history);
+  }
+
+  async function generate() {
+    const text = document.getElementById('pattern-input').value.trim();
+    if (!text) return;
+
+    // Step 1: NLP parse (Practical 3)
+    const stitches = parsePattern(text);
+    renderJSON(stitches);
+
+    if (!stitches.length) {
+      document.getElementById('json-output').textContent = 'No recognisable stitches found. Check pattern syntax.';
+      return;
+    }
+
+    // Step 2: Tensor ops (Practical 1)
+    const tensors = buildTensors(stitches);
+    renderTensors(stitches, tensors);
+
+    // Step 3: Model predict (Practical 2 — Linear Regression)
+    const predictions = await predictPositions(stitches);
+
+    // Step 4: Draw diagram (Practical 5 — Visualization)
+    await drawDiagram(stitches, predictions);
+
+    // Cleanup tensors
+    if (tensors) {
+      tensors.inputTensor.dispose();
+      tensors.normalised.dispose();
+      tensors.cumsum.dispose();
+      tensors.totalStitches.dispose();
+      tensors.meanCount.dispose();
+      tensors.min.dispose();
+      tensors.max.dispose();
+    }
+  }
+
+  // Allow Enter key in textarea with Ctrl
+  document.getElementById('pattern-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.ctrlKey) generate();
+  });
+
+  // Draw empty canvas on load
+  window.addEventListener('load', async () => {
+    drawDiagram([], []);
+    await initModel();
+    // Auto-generate with default pattern
+    generate();
+  });
+  </script>
+</body>
+</html>

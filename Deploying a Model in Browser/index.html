@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deploying a Model in Browser — TensorFlow.js</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- TensorFlow.js core -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+
+    <!-- Font pairing (consistent with series) -->
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <!-- ── Header ── -->
+    <header class="header">
+        <div class="header-left">
+            <div class="badge">TensorFlow.js · LocalStorage · IndexedDB · File I/O</div>
+            <h1>Deploying a Model<br><span class="accent">in the Browser</span></h1>
+        </div>
+        <div class="header-right student-card">
+            <div class="student-row">
+                <span class="label">Name</span>
+                <span class="value">Shrushti Zod</span>
+            </div>
+            <div class="divider-h"></div>
+            <div class="student-row">
+                <span class="label">USN</span>
+                <span class="value">CM23006</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ── Pipeline strip ── -->
+    <div class="pipeline card">
+        <div class="pipe-step" id="pipe-train">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Train</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-save">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Save</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-reload">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Reload</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-predict">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Predict</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-export">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Export</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-import">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Import</span>
+        </div>
+    </div>
+
+    <!-- ── Main Grid ── -->
+    <main class="grid">
+
+        <!-- ── Left column ── -->
+        <div class="left-col">
+
+            <!-- Lab 1: Train + Save -->
+            <section class="card lab-card" id="lab1">
+                <div class="card-label">
+                    <span class="obj-num">01</span>
+                    TRAIN MODEL &amp; SAVE TO LOCALSTORAGE
+                </div>
+                <div class="lab-body">
+                    <p class="lab-desc">
+                        Trains a small dense neural network on the XOR problem
+                        (4 samples, 2 inputs → 1 output) and saves it to browser LocalStorage.
+                    </p>
+
+                    <div class="param-grid">
+                        <div class="param-item">
+                            <label class="param-label">Epochs</label>
+                            <input type="number" id="epochs" class="param-input" value="300" min="50" max="2000">
+                        </div>
+                        <div class="param-item">
+                            <label class="param-label">Learning Rate</label>
+                            <input type="number" id="lr" class="param-input" value="0.1" min="0.001" max="1" step="0.01">
+                        </div>
+                    </div>
+
+                    <button class="action-btn btn-primary" id="btn-train" onclick="trainAndSave()">
+                        <span class="btn-icon">▶</span> Train &amp; Save to LocalStorage
+                    </button>
+
+                    <!-- Training progress -->
+                    <div class="progress-wrap" id="progress-wrap" style="display:none;">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="progress-bar"></div>
+                        </div>
+                        <span class="progress-label" id="progress-label">Epoch 0 / 0</span>
+                    </div>
+
+                    <!-- Training log -->
+                    <div class="log-box" id="train-log"></div>
+                </div>
+            </section>
+
+            <!-- Lab 2: Reload + Verify -->
+            <section class="card lab-card" id="lab2">
+                <div class="card-label">
+                    <span class="obj-num">02</span>
+                    RELOAD FROM LOCALSTORAGE &amp; VERIFY PREDICTIONS
+                </div>
+                <div class="lab-body">
+                    <p class="lab-desc">
+                        Loads the saved model back from LocalStorage and runs predictions
+                        on all XOR inputs to verify they match the original model output.
+                    </p>
+
+                    <button class="action-btn btn-secondary" id="btn-reload" onclick="reloadAndVerify()">
+                        <span class="btn-icon">↺</span> Reload &amp; Verify Predictions
+                    </button>
+
+                    <div class="log-box" id="reload-log"></div>
+
+                    <!-- Comparison table -->
+                    <div id="compare-table-wrap" style="display:none;">
+                        <div class="table-label">Prediction Comparison</div>
+                        <table class="compare-table">
+                            <thead>
+                                <tr>
+                                    <th>Input</th>
+                                    <th>Original</th>
+                                    <th>Reloaded</th>
+                                    <th>Match</th>
+                                </tr>
+                            </thead>
+                            <tbody id="compare-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lab 3: Export / Import -->
+            <section class="card lab-card" id="lab3">
+                <div class="card-label">
+                    <span class="obj-num">03</span>
+                    EXPORT TO FILES &amp; RE-IMPORT
+                </div>
+                <div class="lab-body">
+                    <p class="lab-desc">
+                        Downloads the model as <code>.json</code> + <code>.bin</code> files,
+                        then re-imports them via file picker to run predictions again.
+                    </p>
+
+                    <div class="btn-row">
+                        <button class="action-btn btn-secondary" id="btn-export" onclick="exportModel()">
+                            <span class="btn-icon">↓</span> Export Model Files
+                        </button>
+                        <label class="action-btn btn-secondary file-label" id="btn-import-label">
+                            <span class="btn-icon">↑</span> Import Model Files
+                            <input type="file" id="file-input" multiple accept=".json,.bin" onchange="importModel(event)" style="display:none;">
+                        </label>
+                    </div>
+
+                    <div class="log-box" id="export-log"></div>
+
+                    <div id="import-table-wrap" style="display:none;">
+                        <div class="table-label">Post-Import Predictions</div>
+                        <table class="compare-table">
+                            <thead>
+                                <tr>
+                                    <th>Input</th>
+                                    <th>Expected (XOR)</th>
+                                    <th>Imported Model</th>
+                                    <th>Δ Error</th>
+                                </tr>
+                            </thead>
+                            <tbody id="import-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ── Right sidebar ── -->
+        <aside class="right-panel">
+
+            <!-- Model summary -->
+            <section class="card" id="model-summary-card">
+                <div class="card-label">MODEL SUMMARY</div>
+                <div class="summary-body" id="model-summary">
+                    <div class="empty-state">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="3"/>
+                            <path d="M3 9h18M9 21V9"/>
+                        </svg>
+                        <p>Train a model to see its architecture</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loss chart -->
+            <section class="card">
+                <div class="card-label">TRAINING LOSS</div>
+                <div class="chart-wrap">
+                    <canvas id="loss-chart" width="260" height="160"></canvas>
+                    <div class="chart-empty" id="chart-empty">
+                        <span>Loss curve appears after training</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Storage status -->
+            <section class="card">
+                <div class="card-label">STORAGE STATUS</div>
+                <div class="storage-body" id="storage-status">
+                    <div class="storage-row">
+                        <span class="storage-label">LocalStorage</span>
+                        <span class="storage-badge badge-idle" id="ls-badge">Empty</span>
+                    </div>
+                    <div class="divider-h"></div>
+                    <div class="storage-row">
+                        <span class="storage-label">Exported Files</span>
+                        <span class="storage-badge badge-idle" id="exp-badge">None</span>
+                    </div>
+                    <div class="divider-h"></div>
+                    <div class="storage-row">
+                        <span class="storage-label">Imported Model</span>
+                        <span class="storage-badge badge-idle" id="imp-badge">None</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lab objectives -->
+            <section class="card info-card">
+                <div class="card-label">LAB OBJECTIVES</div>
+                <ul class="objectives">
+                    <li>
+                        <span class="obj-num">01</span>
+                        <span>Train a small model and save it to LocalStorage</span>
+                    </li>
+                    <li>
+                        <span class="obj-num">02</span>
+                        <span>Reload the model and verify predictions match the original</span>
+                    </li>
+                    <li>
+                        <span class="obj-num">03</span>
+                        <span>Export model to files and re-import; test predictions again</span>
+                    </li>
+                </ul>
+            </section>
+
+        </aside>
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

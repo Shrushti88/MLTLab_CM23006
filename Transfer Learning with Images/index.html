@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transfer Learning — MobileNet</title>
+    <link rel="stylesheet" href="style.css">
+
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
+    <!-- MobileNet feature extractor -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.0/dist/mobilenet.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- ── Header ── -->
+    <header class="header">
+        <div class="header-left">
+            <div class="badge">TensorFlow.js · MobileNet · Transfer Learning</div>
+            <h1>Transfer Learning<br><span class="accent">with MobileNet</span></h1>
+        </div>
+        <div class="header-right student-card">
+            <div class="student-row">
+                <span class="label">Name</span>
+                <span class="value">Shrushti Zod</span>
+            </div>
+            <div class="divider-h"></div>
+            <div class="student-row">
+                <span class="label">USN</span>
+                <span class="value">CM23006</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ── Pipeline strip ── -->
+    <div class="pipeline card">
+        <div class="pipe-step" id="pipe-load">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Load Base</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-collect">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Collect</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-train">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Retrain</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-eval">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Evaluate</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-expand">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Expand</span>
+        </div>
+        <div class="pipe-arrow">→</div>
+        <div class="pipe-step" id="pipe-predict">
+            <span class="pipe-icon">⬡</span>
+            <span class="pipe-label">Predict</span>
+        </div>
+    </div>
+
+    <!-- ── Main Grid ── -->
+    <main class="grid">
+
+        <!-- ══ LEFT COLUMN ══ -->
+        <div class="left-col">
+
+            <!-- ── Lab 1: Collect + Train ── -->
+            <section class="card lab-card">
+                <div class="card-label">
+                    <span class="obj-num">01</span>
+                    COLLECT SAMPLES &amp; RETRAIN MOBILENET
+                </div>
+                <div class="lab-body">
+
+                    <p class="lab-desc">
+                        MobileNet acts as a frozen feature extractor. Point your webcam at each
+                        category and capture samples. A small dense head is then retrained on top
+                        of the extracted embeddings.
+                    </p>
+
+                    <!-- Webcam + overlay -->
+                    <div class="video-wrapper">
+                        <video id="webcam" autoplay playsinline muted></video>
+                        <canvas id="overlay"></canvas>
+                        <div class="fps-counter">
+                            <span class="fps-icon">◈</span>
+                            <span id="fps-value">LIVE</span>
+                        </div>
+                        <div id="loading-overlay" class="loading-overlay">
+                            <div class="spinner-ring"></div>
+                            <p class="loading-title">Loading MobileNet</p>
+                            <p class="loading-sub">Initialising feature extractor…</p>
+                        </div>
+                    </div>
+
+                    <!-- Category tabs -->
+                    <div class="category-tabs" id="category-tabs">
+                        <!-- rendered by JS -->
+                    </div>
+
+                    <!-- Capture controls -->
+                    <div class="capture-row">
+                        <button class="action-btn btn-primary" id="btn-capture" onclick="captureFrame()" disabled>
+                            <span class="btn-icon">⊕</span> Capture Sample
+                        </button>
+                        <button class="action-btn btn-secondary" id="btn-add-cat" onclick="addCategory()">
+                            <span class="btn-icon">+</span> Add Category
+                        </button>
+                        <button class="action-btn btn-secondary" id="btn-clear" onclick="clearSamples()">
+                            <span class="btn-icon">✕</span> Clear All
+                        </button>
+                    </div>
+
+                    <!-- Sample counts per class -->
+                    <div class="sample-counts" id="sample-counts"></div>
+
+                    <!-- Train controls -->
+                    <div class="divider-h"></div>
+
+                    <div class="param-grid">
+                        <div class="param-item">
+                            <label class="param-label">Epochs</label>
+                            <input type="number" id="epochs" class="param-input" value="30" min="5" max="200">
+                        </div>
+                        <div class="param-item">
+                            <label class="param-label">Learning Rate</label>
+                            <input type="number" id="lr" class="param-input" value="0.001" min="0.0001" max="0.1" step="0.0001">
+                        </div>
+                        <div class="param-item">
+                            <label class="param-label">Batch Size</label>
+                            <input type="number" id="batchsize" class="param-input" value="16" min="4" max="64">
+                        </div>
+                        <div class="param-item">
+                            <label class="param-label">Hidden Units</label>
+                            <input type="number" id="hunits" class="param-input" value="64" min="16" max="256">
+                        </div>
+                    </div>
+
+                    <button class="action-btn btn-primary" id="btn-train" onclick="trainModel()" disabled>
+                        <span class="btn-icon">▶</span> Retrain Head
+                    </button>
+
+                    <!-- Progress -->
+                    <div class="progress-wrap" id="progress-wrap" style="display:none;">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" id="progress-bar"></div>
+                        </div>
+                        <span class="progress-label" id="progress-label">Epoch 0 / 0</span>
+                    </div>
+
+                    <div class="log-box" id="train-log"></div>
+                </div>
+            </section>
+
+            <!-- ── Lab 2: Evaluate ── -->
+            <section class="card lab-card">
+                <div class="card-label">
+                    <span class="obj-num">02</span>
+                    EVALUATE ACCURACY &amp; CONFUSION MATRIX
+                </div>
+                <div class="lab-body">
+                    <p class="lab-desc">
+                        Uses 20% of captured samples as a held-out validation set.
+                        Reports per-class accuracy and renders a confusion matrix.
+                    </p>
+
+                    <button class="action-btn btn-secondary" id="btn-eval" onclick="evaluateModel()" disabled>
+                        <span class="btn-icon">◎</span> Run Evaluation
+                    </button>
+
+                    <div class="log-box" id="eval-log"></div>
+
+                    <!-- Accuracy bars -->
+                    <div id="accuracy-bars" style="display:none;">
+                        <div class="table-label">Per-Class Accuracy</div>
+                        <div id="acc-bar-container" class="acc-bars"></div>
+                    </div>
+
+                    <!-- Confusion matrix -->
+                    <div id="confusion-wrap" style="display:none;">
+                        <div class="table-label" style="margin-top:14px;">Confusion Matrix</div>
+                        <div id="confusion-matrix" class="confusion-matrix"></div>
+                        <p class="cm-hint">Rows = Actual · Columns = Predicted</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ── Lab 3: Predict live ── -->
+            <section class="card lab-card">
+                <div class="card-label">
+                    <span class="obj-num">03</span>
+                    LIVE PREDICTION &amp; INCREMENTAL CATEGORIES
+                </div>
+                <div class="lab-body">
+                    <p class="lab-desc">
+                        Runs continuous live prediction on the webcam feed using the trained head.
+                        Add new categories and retrain to observe performance changes.
+                    </p>
+
+                    <div class="btn-row">
+                        <button class="action-btn btn-primary"   id="btn-start-pred" onclick="startPredicting()" disabled>
+                            <span class="btn-icon">▶</span> Start Live Predict
+                        </button>
+                        <button class="action-btn btn-secondary" id="btn-stop-pred"  onclick="stopPredicting()"  disabled>
+                            <span class="btn-icon">■</span> Stop
+                        </button>
+                    </div>
+
+                    <!-- Live confidence bars -->
+                    <div id="live-bars" class="live-bars"></div>
+
+                    <!-- Performance delta table -->
+                    <div id="perf-delta-wrap" style="display:none;">
+                        <div class="table-label" style="margin-top:14px;">Incremental Training Log</div>
+                        <table class="compare-table" id="perf-table">
+                            <thead>
+                                <tr>
+                                    <th>Run</th>
+                                    <th>Categories</th>
+                                    <th>Samples</th>
+                                    <th>Val Acc</th>
+                                    <th>Δ Acc</th>
+                                </tr>
+                            </thead>
+                            <tbody id="perf-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="log-box" id="pred-log"></div>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- ══ RIGHT SIDEBAR ══ -->
+        <aside class="right-panel">
+
+            <!-- Model architecture -->
+            <section class="card">
+                <div class="card-label">ARCHITECTURE</div>
+                <div class="arch-body" id="arch-body">
+                    <div class="arch-block frozen">
+                        <div class="arch-label">MobileNet v1</div>
+                        <div class="arch-sub">Feature Extractor · FROZEN</div>
+                        <div class="arch-dim">→ 1024-d embedding</div>
+                    </div>
+                    <div class="arch-arrow">↓</div>
+                    <div class="arch-block trainable" id="arch-head">
+                        <div class="arch-label">Dense Head</div>
+                        <div class="arch-sub">Trainable · Softmax out</div>
+                        <div class="arch-dim" id="arch-dim">? classes</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dataset stats -->
+            <section class="card">
+                <div class="card-label">DATASET STATS</div>
+                <div class="stats-body" id="stats-body">
+                    <div class="stat-row">
+                        <span class="stat-label">Categories</span>
+                        <span class="stat-val" id="stat-cats">0</span>
+                    </div>
+                    <div class="divider-h"></div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total Samples</span>
+                        <span class="stat-val" id="stat-total">0</span>
+                    </div>
+                    <div class="divider-h"></div>
+                    <div class="stat-row">
+                        <span class="stat-label">Train Split</span>
+                        <span class="stat-val">80%</span>
+                    </div>
+                    <div class="divider-h"></div>
+                    <div class="stat-row">
+                        <span class="stat-label">Val Split</span>
+                        <span class="stat-val">20%</span>
+                    </div>
+                    <div class="divider-h"></div>
+                    <div class="stat-row">
+                        <span class="stat-label">Model Status</span>
+                        <span class="storage-badge badge-idle" id="model-status-badge">Untrained</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Loss chart -->
+            <section class="card">
+                <div class="card-label">TRAINING LOSS</div>
+                <div class="chart-wrap">
+                    <canvas id="loss-chart" width="250" height="140"></canvas>
+                    <div class="chart-empty" id="chart-empty">Loss curve after training</div>
+                </div>
+            </section>
+
+            <!-- Val accuracy chart -->
+            <section class="card">
+                <div class="card-label">VALIDATION ACCURACY</div>
+                <div class="chart-wrap">
+                    <canvas id="acc-chart" width="250" height="140"></canvas>
+                    <div class="chart-empty" id="acc-chart-empty">Accuracy curve after training</div>
+                </div>
+            </section>
+
+            <!-- Lab objectives -->
+            <section class="card">
+                <div class="card-label">LAB OBJECTIVES</div>
+                <ul class="objectives">
+                    <li>
+                        <span class="obj-num">01</span>
+                        <span>Retrain MobileNet head for a custom fruit dataset with 3 categories</span>
+                    </li>
+                    <li>
+                        <span class="obj-num">02</span>
+                        <span>Evaluate validation accuracy and report confusion matrix</span>
+                    </li>
+                    <li>
+                        <span class="obj-num">03</span>
+                        <span>Add categories incrementally, retrain, and analyse performance changes</span>
+                    </li>
+                </ul>
+            </section>
+
+        </aside>
+    </main>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
