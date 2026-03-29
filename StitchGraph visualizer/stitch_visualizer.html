@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>StitchGraph Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:       #f7f4ef;
+      --panel:    #ffffff;
+      --border:   #e0d9ce;
+      --ink:      #1a1510;
+      --ink-mid:  #6b5d4a;
+      --ink-dim:  #a89880;
+      --accent:   #2c2416;
+      --row-even: #faf8f4;
+      --row-odd:  #f5f1ea;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      color: var(--ink);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 28px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+    }
+
+    header h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.35rem;
+      color: var(--ink);
+      letter-spacing: -0.3px;
+    }
+
+    header h1 span { color: #8c6b4a; font-style: italic; }
+
+    .header-sub {
+      font-size: 0.65rem;
+      color: var(--ink-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    /* ── Body layout ── */
+    .layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      overflow: hidden;
+    }
+
+    /* ── Left: pattern input ── */
+    .left-panel {
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .panel-head-label {
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+
+    .btn-clear {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      padding: 4px 10px;
+      background: transparent;
+      color: var(--ink-mid);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-clear:hover { background: var(--bg); }
+
+    /* Row list */
+    .row-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 14px;
+    }
+
+    .row-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .row-num {
+      font-size: 0.65rem;
+      color: var(--ink-dim);
+      width: 36px;
+      flex-shrink: 0;
+      text-align: right;
+      letter-spacing: 0.5px;
+    }
+
+    .row-input {
+      flex: 1;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      color: var(--ink);
+      background: var(--bg);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .row-input:focus { border-color: #8c6b4a; background: #fff; }
+    .row-input::placeholder { color: var(--ink-dim); }
+
+    .btn-del-row {
+      width: 22px; height: 22px;
+      flex-shrink: 0;
+      background: transparent;
+      border: none;
+      color: var(--ink-dim);
+      cursor: pointer;
+      font-size: 14px;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .btn-del-row:hover { background: #fee2e2; color: #b91c1c; }
+
+    /* Add row area */
+    .add-row-wrap {
+      flex-shrink: 0;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-add-row {
+      width: 100%;
+      padding: 9px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: opacity 0.15s;
+    }
+
+    .btn-add-row:hover { opacity: 0.85; }
+
+    /* Stitch key */
+    .stitch-key {
+      flex-shrink: 0;
+      padding: 10px 14px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--row-even);
+    }
+
+    .key-title {
+      font-size: 0.58rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+      margin-bottom: 8px;
+    }
+
+    .key-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px 8px;
+    }
+
+    .key-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.65rem;
+      color: var(--ink-mid);
+    }
+
+    .key-sym {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--ink);
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    /* ── Right: canvas ── */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--bg);
+    }
+
+    .canvas-head {
+      flex-shrink: 0;
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .canvas-head-label {
+      font-size: 0.62rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--ink-dim);
+    }
+
+    .canvas-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .zoom-btn {
+      width: 26px; height: 26px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--ink-mid);
+    }
+
+    .zoom-btn:hover { background: #fff; }
+
+    .zoom-label {
+      font-size: 0.65rem;
+      color: var(--ink-dim);
+      min-width: 36px;
+      text-align: center;
+    }
+
+    .canvas-scroll {
+      flex: 1;
+      overflow: auto;
+      padding: 24px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+    }
+
+    #stitch-canvas {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 2px 12px rgba(44,36,22,0.07);
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+
+    /* hint bar */
+    .hint-bar {
+      flex-shrink: 0;
+      padding: 6px 20px;
+      font-size: 0.62rem;
+      color: var(--ink-dim);
+      border-top: 1px solid var(--border);
+      background: var(--panel);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>StitchGraph <span>Visualizer</span></h1>
+    <div class="header-sub">Pattern → Visual Diagram</div>
+  </header>
+
+  <div class="layout">
+
+    <!-- ── LEFT: Pattern Input ── -->
+    <div class="left-panel">
+
+      <div class="panel-head">
+        <span class="panel-head-label">Pattern Rows</span>
+        <button class="btn-clear" onclick="clearAll()">Clear all</button>
+      </div>
+
+      <div class="row-list" id="row-list"></div>
+
+      <div class="add-row-wrap">
+        <button class="btn-add-row" onclick="addRow()">+ Add row</button>
+      </div>
+
+      <!-- Stitch key reference -->
+      <div class="stitch-key">
+        <div class="key-title">Stitch Key</div>
+        <div class="key-grid">
+          <div class="key-item"><span class="key-sym">○</span> ch</div>
+          <div class="key-item"><span class="key-sym">•</span> sl st</div>
+          <div class="key-item"><span class="key-sym">×</span> sc</div>
+          <div class="key-item"><span class="key-sym">T</span> hdc</div>
+          <div class="key-item"><span class="key-sym">T̈</span> dc</div>
+          <div class="key-item"><span class="key-sym">Ṫ</span> tr</div>
+          <div class="key-item"><span class="key-sym">Y</span> inc</div>
+          <div class="key-item"><span class="key-sym">⋀</span> dec</div>
+          <div class="key-item"><span class="key-sym">dtr</span> dtr</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: Canvas ── -->
+    <div class="right-panel">
+      <div class="canvas-head">
+        <span class="canvas-head-label">Stitch Diagram</span>
+        <div class="canvas-controls">
+          <button class="zoom-btn" onclick="zoom(-0.1)">−</button>
+          <span class="zoom-label" id="zoom-label">100%</span>
+          <button class="zoom-btn" onclick="zoom(+0.1)">+</button>
+          <button class="zoom-btn" onclick="resetZoom()" title="Reset zoom">⊙</button>
+        </div>
+      </div>
+      <div class="canvas-scroll" id="canvas-scroll">
+        <canvas id="stitch-canvas"></canvas>
+      </div>
+      <div class="hint-bar">
+        Press <strong>Enter</strong> in any row to add the next row. Press <strong>Tab</strong> to move between rows.
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  "use strict";
+
+  // ══════════════════════════════════════════════════════════════
+  //  PARSER — converts pattern text to structured stitch tokens
+  //  "17 ch"   → [{type:'ch', count:17}]
+  //  "1 ch, 17 sc" → [{type:'ch',count:1},{type:'sc',count:17}]
+  // ══════════════════════════════════════════════════════════════
+
+  const STITCH_ABBREVS = [
+    'sl st', 'dc3tog', 'dc2tog', 'sc2tog', 'sc3tog',
+    'dtr', 'hdc', 'dc', 'sc', 'ch', 'tr', 'sl',
+    'inc', 'dec'
+  ];
+
+  function parseRow(text) {
+    if (!text || !text.trim()) return [];
+    const tokens = [];
+    // Split on commas, semicolons, or newlines
+    const parts = text.toLowerCase().split(/[,;\n]+/).map(p => p.trim()).filter(Boolean);
+
+    for (const part of parts) {
+      // Try to match: [optional count] [stitch] [optional count]
+      // Handles: "17 sc", "sc 17", "sc", "17ch", etc.
+      let matched = false;
+
+      // Two-word stitches first (sl st, dc3tog, etc.)
+      for (const ab of STITCH_ABBREVS) {
+        const escapedAb = ab.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        // Pattern: "N ab"
+        let m = part.match(new RegExp('^(\\d+)\\s*' + escapedAb + '$'));
+        if (m) { tokens.push({ type: ab, count: parseInt(m[1]) }); matched = true; break; }
+
+        // Pattern: "ab N"
+        m = part.match(new RegExp('^' + escapedAb + '\\s*(\\d+)$'));
+        if (m) { tokens.push({ type: ab, count: parseInt(m[1]) }); matched = true; break; }
+
+        // Pattern: bare "ab"
+        if (part === ab) { tokens.push({ type: ab, count: 1 }); matched = true; break; }
+      }
+
+      if (!matched) {
+        // Try generic: digits + word or word + digits
+        const m1 = part.match(/^(\d+)\s*([a-z]+)$/);
+        if (m1) { tokens.push({ type: m1[2], count: parseInt(m1[1]) }); continue; }
+        const m2 = part.match(/^([a-z]+)\s*(\d+)$/);
+        if (m2) { tokens.push({ type: m2[1], count: parseInt(m2[2]) }); continue; }
+        // bare stitch
+        const m3 = part.match(/^([a-z\s]+)$/);
+        if (m3) tokens.push({ type: part.trim(), count: 1 });
+      }
+    }
+    return tokens;
+  }
+
+  // Identify if a token is a turning chain
+  function isTurningChain(token, index, rowTokens) {
+    // A turning chain is a chain at the START of a row (not Row 1 foundation chain)
+    return token.type === 'ch' && index === 0 && rowTokens.length > 1;
+  }
+
+  // Height units for each stitch (in canvas units)
+  // Based on standard crochet chart proportions
+  const STITCH_HEIGHT = {
+    'ch':     0,    // foundation/turning chains are horizontal
+    'sl st':  0.5,
+    'sc':     1,
+    'hdc':    1.5,
+    'dc':     2,
+    'tr':     3,
+    'dtr':    4,
+    'inc':    1,
+    'dec':    1,
+    'sc2tog': 1,
+    'dc2tog': 2,
+    'dc3tog': 2,
+    'sc3tog': 1,
+  };
+
+  // Turning chain height = how many height units the turning chain adds
+  const TURNING_CHAIN_HEIGHT = {
+    1: 1,   // 1 ch = sc height
+    2: 1.5, // 2 ch = hdc height
+    3: 2,   // 3 ch = dc height
+    4: 3,   // 4 ch = tr height
+  };
+
+
+  // ══════════════════════════════════════════════════════════════
+  //  CANVAS RENDERER
+  // ══════════════════════════════════════════════════════════════
+
+  const UNIT    = 22;   // base grid unit in pixels
+  const PAD_X   = 40;   // canvas left/right padding
+  const PAD_Y   = 40;   // canvas top/bottom padding
+  const CHAIN_R = UNIT * 0.35; // chain oval radius
+
+  let canvasScale = 1.0;
+
+  function getCanvas() { return document.getElementById('stitch-canvas'); }
+  function getCtx()    { return getCanvas().getContext('2d'); }
+
+  /**
+   * Main render function.
+   * Parses all rows, computes Y positions, draws stitches.
+   */
+  function render() {
+    const rows = getRows(); // [{text, tokens}]
+    const canvas = getCanvas();
+    const ctx = getCtx();
+
+    if (!rows.length) {
+      canvas.width  = 400;
+      canvas.height = 200;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#e0d9ce';
+      ctx.font = '13px DM Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('Add rows to see your diagram', 200, 100);
+      return;
+    }
+
+    // ── LAYOUT PASS ──
+    // Determine stitch count per row (max for canvas width)
+    // and cumulative Y positions (rows stack bottom-to-top)
+
+    const rowLayouts = []; // [{tokens, stitchCount, startY, height, turningChainH}]
+    let maxStitchCount = 0;
+
+    for (let ri = 0; ri < rows.length; ri++) {
+      const tokens = rows[ri].tokens;
+      let stitchCount = 0;
+      let turningChainH = 0;
+      let mainHeight = 1; // in UNIT multiples
+
+      for (let ti = 0; ti < tokens.length; ti++) {
+        const t = tokens[ti];
+        if (ri === 0 && t.type === 'ch') {
+          // Foundation chain — counts as width
+          stitchCount += t.count;
+        } else if (isTurningChain(t, ti, tokens)) {
+          // Turning chain — adds height
+          turningChainH = TURNING_CHAIN_HEIGHT[t.count] || 1;
+        } else {
+          // Regular stitches — count for width
+          stitchCount += t.count;
+          // Row height = tallest stitch
+          const h = STITCH_HEIGHT[t.type] || 1;
+          if (h > mainHeight) mainHeight = h;
+        }
+      }
+
+      maxStitchCount = Math.max(maxStitchCount, stitchCount);
+      rowLayouts.push({ tokens, stitchCount, height: mainHeight, turningChainH, isFoundation: ri === 0 });
+    }
+
+    // Compute canvas dimensions
+    const canvasW = (maxStitchCount + 1) * UNIT + PAD_X * 2;
+
+    // Compute Y positions bottom-to-top
+    // Row 1 (foundation) at the bottom, Row N at the top
+    let cumulativeY = PAD_Y;
+    // Collect total heights first to set canvas height
+    const rowHeights = rowLayouts.map(r =>
+      r.isFoundation ? UNIT * 1.2 : (r.height + r.turningChainH) * UNIT
+    );
+    const totalHeight = rowHeights.reduce((a, b) => a + b, 0) + PAD_Y * 2;
+
+    const canvasH = Math.max(200, totalHeight);
+
+    // Apply device pixel ratio for sharpness
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width  = canvasW * dpr * canvasScale;
+    canvas.height = canvasH * dpr * canvasScale;
+    canvas.style.width  = (canvasW * canvasScale) + 'px';
+    canvas.style.height = (canvasH * canvasScale) + 'px';
+    ctx.scale(dpr * canvasScale, dpr * canvasScale);
+
+    // White background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // Draw grid dots (subtle)
+    ctx.fillStyle = 'rgba(44,36,22,0.04)';
+    for (let gx = PAD_X; gx <= canvasW - PAD_X; gx += UNIT) {
+      for (let gy = PAD_Y; gy <= canvasH - PAD_Y; gy += UNIT * 0.5) {
+        ctx.beginPath();
+        ctx.arc(gx, gy, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.strokeStyle = '#1a1510';
+    ctx.fillStyle   = '#1a1510';
+    ctx.lineWidth   = 1.4;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+
+    // Assign Y positions bottom-up
+    // foundationY = bottom of canvas, each row stacks above
+    let rowBaseYs = [];
+    let y = canvasH - PAD_Y;
+    for (let ri = 0; ri < rowLayouts.length; ri++) {
+      rowBaseYs.push(y);
+      y -= rowHeights[ri];
+    }
+
+    // ── DRAW PASS ──
+    for (let ri = 0; ri < rowLayouts.length; ri++) {
+      const layout  = rowLayouts[ri];
+      const baseY   = rowBaseYs[ri];
+      const tokens  = layout.tokens;
+      let   col     = 0; // current horizontal stitch position (0-indexed)
+
+      // Row label
+      ctx.save();
+      ctx.fillStyle = '#a89880';
+      ctx.font = '9px DM Mono, monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText('R' + (ri + 1), PAD_X - 6, baseY + 4);
+      ctx.restore();
+
+      for (let ti = 0; ti < tokens.length; ti++) {
+        const t = tokens[ti];
+
+        // ── FOUNDATION CHAIN (Row 1) ──
+        if (ri === 0 && t.type === 'ch') {
+          for (let c = 0; c < t.count; c++) {
+            const x = PAD_X + col * UNIT;
+            drawChain(ctx, x, baseY);
+            col++;
+          }
+          continue;
+        }
+
+        // ── TURNING CHAIN ──
+        if (isTurningChain(t, ti, tokens)) {
+          // Draw turning chain as a small vertical oval to the right of the row
+          const x = PAD_X + (col) * UNIT + UNIT * 0.5;
+          drawTurningChain(ctx, x, baseY, t.count);
+          continue;
+        }
+
+        // ── REGULAR STITCHES ──
+        const tcH = layout.turningChainH * UNIT; // turning chain height offset
+        for (let c = 0; c < t.count; c++) {
+          const x = PAD_X + col * UNIT;
+          const y = baseY - tcH;
+          drawStitch(ctx, t.type, x, y, layout.height);
+          col++;
+        }
+      }
+    }
+  }
+
+  // ── Individual stitch drawers ──
+  // All stitches drawn with base at (x, y), building upward
+
+  function drawChain(ctx, x, y) {
+    // Chain = small horizontal oval
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(x + UNIT / 2, y, CHAIN_R * 1.1, CHAIN_R * 0.65, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = '#1a1510';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTurningChain(ctx, x, y, count) {
+    // Turning chain = small chain links going upward
+    ctx.save();
+    ctx.strokeStyle = '#1a1510';
+    ctx.lineWidth = 1.2;
+    const linkH = UNIT * 0.4;
+    for (let i = 0; i < count; i++) {
+      const cy = y - i * linkH - linkH / 2;
+      ctx.beginPath();
+      ctx.ellipse(x, cy, CHAIN_R * 0.7, CHAIN_R * 0.45, Math.PI / 2, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawStitch(ctx, type, x, y, rowHeight) {
+    // x = center-left of stitch column, y = base of stitch (builds upward)
+    const cx = x + UNIT / 2; // center x of this column
+
+    ctx.save();
+    ctx.strokeStyle = '#1a1510';
+    ctx.fillStyle   = '#1a1510';
+    ctx.lineWidth   = 1.4;
+
+    switch (type) {
+      case 'sl st':
+        // Slip stitch = small filled circle at base
+        ctx.beginPath();
+        ctx.arc(cx, y - UNIT * 0.15, UNIT * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'sc':
+        // Single crochet = × (X symbol)
+        // Two diagonal lines crossing
+        drawX(ctx, cx, y, UNIT * 0.38, UNIT * 0.7);
+        break;
+
+      case 'hdc':
+        // Half DC = T with one crossbar lower down
+        drawVertical(ctx, cx, y, UNIT * 1.5);
+        drawCrossbar(ctx, cx, y - UNIT * 0.6, UNIT * 0.4);
+        drawCrossbar(ctx, cx, y - UNIT * 1.1, UNIT * 0.35); // top crossbar
+        break;
+
+      case 'dc':
+        // Double crochet = tall T with 2 crossbars
+        drawVertical(ctx, cx, y, UNIT * 2.0);
+        drawCrossbar(ctx, cx, y - UNIT * 0.7, UNIT * 0.38);
+        drawCrossbar(ctx, cx, y - UNIT * 1.35, UNIT * 0.38);
+        break;
+
+      case 'tr':
+        // Treble = taller T with 3 crossbars
+        drawVertical(ctx, cx, y, UNIT * 3.0);
+        drawCrossbar(ctx, cx, y - UNIT * 0.75, UNIT * 0.38);
+        drawCrossbar(ctx, cx, y - UNIT * 1.5,  UNIT * 0.38);
+        drawCrossbar(ctx, cx, y - UNIT * 2.2,  UNIT * 0.38);
+        break;
+
+      case 'dtr':
+        // Double treble = very tall T with 4 crossbars
+        drawVertical(ctx, cx, y, UNIT * 4.0);
+        [0.8, 1.6, 2.4, 3.2].forEach(f => drawCrossbar(ctx, cx, y - UNIT * f, UNIT * 0.38));
+        break;
+
+      case 'inc':
+        // Increase = two sc/dc from same stitch (V shape)
+        drawV(ctx, cx, y, UNIT * 0.38, UNIT * 0.8);
+        break;
+
+      case 'dec':
+      case 'sc2tog':
+        // Decrease = two sc merged at top (inverted V)
+        drawInvV(ctx, cx, y, UNIT * 0.38, UNIT * 0.8);
+        break;
+
+      case 'dc2tog':
+      case 'dc3tog':
+        // DC decrease = tall inverted V
+        drawInvV(ctx, cx, y, UNIT * 0.4, UNIT * 1.8);
+        break;
+
+      default:
+        // Unknown stitch — draw a question mark symbol
+        ctx.font = '9px DM Mono, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(type, cx, y - UNIT * 0.5);
+        break;
+    }
+
+    ctx.restore();
+  }
+
+  // ── Drawing primitives ──
+
+  function drawVertical(ctx, cx, baseY, height) {
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY);
+    ctx.lineTo(cx, baseY - height);
+    ctx.stroke();
+  }
+
+  function drawCrossbar(ctx, cx, y, halfLen) {
+    ctx.beginPath();
+    ctx.moveTo(cx - halfLen, y);
+    ctx.lineTo(cx + halfLen, y);
+    ctx.stroke();
+  }
+
+  // X symbol for sc — two crossing diagonals
+  function drawX(ctx, cx, baseY, hw, h) {
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, baseY - h);
+    ctx.lineTo(cx + hw, baseY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + hw, baseY - h);
+    ctx.lineTo(cx - hw, baseY);
+    ctx.stroke();
+  }
+
+  // V shape for increase (two lines from base going up-outward then in)
+  function drawV(ctx, cx, baseY, hw, h) {
+    // Left branch
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY);
+    ctx.lineTo(cx - hw, baseY - h);
+    ctx.stroke();
+    // Right branch
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY);
+    ctx.lineTo(cx + hw, baseY - h);
+    ctx.stroke();
+  }
+
+  // Inverted V for decrease (two lines from sides converging at top)
+  function drawInvV(ctx, cx, baseY, hw, h) {
+    ctx.beginPath();
+    ctx.moveTo(cx - hw, baseY);
+    ctx.lineTo(cx,      baseY - h);
+    ctx.lineTo(cx + hw, baseY);
+    ctx.stroke();
+  }
+
+
+  // ══════════════════════════════════════════════════════════════
+  //  ROW INPUT SYSTEM
+  // ══════════════════════════════════════════════════════════════
+
+  let rowData = []; // array of {text}
+
+  function getRows() {
+    return rowData.map(r => ({
+      text: r.text,
+      tokens: parseRow(r.text)
+    }));
+  }
+
+  function addRow(defaultText) {
+    const idx = rowData.length;
+    rowData.push({ text: defaultText || '' });
+    renderRowList();
+    // Focus new input
+    setTimeout(() => {
+      const inputs = document.querySelectorAll('.row-input');
+      if (inputs[idx]) inputs[idx].focus();
+    }, 50);
+  }
+
+  function removeRow(idx) {
+    rowData.splice(idx, 1);
+    renderRowList();
+    render();
+  }
+
+  function clearAll() {
+    if (rowData.length === 0) return;
+    if (!confirm('Clear all rows?')) return;
+    rowData = [];
+    renderRowList();
+    render();
+  }
+
+  function renderRowList() {
+    const container = document.getElementById('row-list');
+    container.innerHTML = '';
+
+    rowData.forEach((row, idx) => {
+      const item = document.createElement('div');
+      item.className = 'row-item';
+
+      const num = document.createElement('div');
+      num.className = 'row-num';
+      num.textContent = 'R' + (idx + 1);
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'row-input';
+      input.value = row.text;
+      input.placeholder = getPlaceholder(idx);
+
+      input.addEventListener('input', () => {
+        rowData[idx].text = input.value;
+        render();
+      });
+
+      // Enter → add next row
+      input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          addRow();
+        } else if (e.key === 'Backspace' && input.value === '' && rowData.length > 1) {
+          e.preventDefault();
+          removeRow(idx);
+          // focus previous
+          setTimeout(() => {
+            const inputs = document.querySelectorAll('.row-input');
+            if (inputs[idx - 1]) inputs[idx - 1].focus();
+          }, 50);
+        }
+      });
+
+      const del = document.createElement('button');
+      del.className = 'btn-del-row';
+      del.innerHTML = '×';
+      del.title = 'Remove row';
+      del.addEventListener('click', () => removeRow(idx));
+
+      item.appendChild(num);
+      item.appendChild(input);
+      item.appendChild(del);
+      container.appendChild(item);
+    });
+  }
+
+  function getPlaceholder(idx) {
+    if (idx === 0) return 'e.g. 17 ch';
+    if (idx === 1) return 'e.g. 1 ch, 17 sc';
+    if (idx === 2) return 'e.g. 2 ch, 17 dc';
+    return 'e.g. 1 ch, 17 sc';
+  }
+
+
+  // ══════════════════════════════════════════════════════════════
+  //  ZOOM
+  // ══════════════════════════════════════════════════════════════
+
+  function zoom(delta) {
+    canvasScale = Math.max(0.3, Math.min(3.0, canvasScale + delta));
+    document.getElementById('zoom-label').textContent = Math.round(canvasScale * 100) + '%';
+    render();
+  }
+
+  function resetZoom() {
+    canvasScale = 1.0;
+    document.getElementById('zoom-label').textContent = '100%';
+    render();
+  }
+
+
+  // ══════════════════════════════════════════════════════════════
+  //  INIT — default pattern
+  // ══════════════════════════════════════════════════════════════
+
+  const DEFAULT_ROWS = [
+    '17 ch',
+    '1 ch, 17 sc',
+    '2 ch, 17 dc',
+    '1 ch, 17 sc',
+    '2 ch, 17 dc',
+    '1 ch, 17 sc',
+  ];
+
+  function init() {
+    DEFAULT_ROWS.forEach(r => rowData.push({ text: r }));
+    renderRowList();
+    render();
+  }
+
+  init();
+  </script>
+</body>
+</html>
